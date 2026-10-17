@@ -6,6 +6,9 @@ Cache/
 .claude/skills/
 .claude/settings.local.json
 
+# Lens Studio MCP config: holds a per-session bearer token
+.mcp.json
+
 # OS
 .DS_Store
 Thumbs.db
