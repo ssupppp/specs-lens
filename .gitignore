@@ -1,0 +1,11 @@
+# Lens Studio
+Cache/
+*.lock
+
+# Local Claude Code state (plan-lens is a machine-specific symlink; real copy is in .agents/skills)
+.claude/skills/
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
