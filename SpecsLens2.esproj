@@ -13,7 +13,7 @@ metaInfo:
     []
   tags:
     []
-  lensName: Untitled
+  lensName: SpecsBaseTemplate
   lensDescriptors:
     []
   lensApplicableContext:
@@ -24,13 +24,12 @@ metaInfo:
     - Front
     - Back
   lensClientCompatibilities:
-    - Mobile
-    - CameraKit
+    - Spectacles
   platformBundlesEnabled: false
   iconHash: ""
   videoPreviewHash: ""
   localizationsHash: ""
-  fromTemplateName: Default
+  fromTemplateName: Specs Base Template
   fromTemplateUrl: Lens Studio 5.24.1.26100516
   activationCamera: Front
   sourceMapEnabled: false
@@ -46,10 +45,10 @@ metaInfo:
     minor: 0
     patch: 0
     build: 0
-  documentId: 10332c5d-564b-456d-b503-57eaf1639cbb
-  originalDocumentId: f3d524c5-ac07-44a7-b03a-e07d591396ec
+  documentId: b47fce1d-b15e-4a80-ad5c-8ed1d62ae801
+  originalDocumentId: 4492aa5f-47e4-4abe-9643-7d6f708b0869
   packageId: ""
   packageVersion: ""
   spkPrivilegeLevel: Generic
   gluboEnabled: false
-targetPlatform: Snapchat
+targetPlatform: Spectacles
