@@ -37,7 +37,7 @@ export class HandsOnC1OpenScenario extends Scenario {
     log("C1: cam " + v(camPos) + " legCenter " + v(legCenter) + " ahead=" + ahead.toFixed(1) + " below=" + below.toFixed(1) + " lateral=" + lateral.toFixed(1))
 
     expect(ahead, "leg distance in front (cm)").toBeGreaterThan(40)
-    expect(ahead, "leg distance in front (cm)").toBeLessThan(60)
+    expect(ahead, "leg distance in front (cm)").toBeLessThan(70)
     expect(below, "leg drop below eye level (cm)").toBeGreaterThan(3)
     expect(below, "leg drop below eye level (cm)").toBeLessThan(35)
     expect(Math.abs(lateral), "leg sideways offset (cm)").toBeLessThan(20)
