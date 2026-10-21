@@ -29,3 +29,9 @@ ls-live-instance.json.tmp
 
 # OS
 Thumbs.db
+
+# Added by Lens Studio (LEAF plugin)
+leaf_plugin_settings.json
+
+# Preview-agent scene snapshots (regenerated, not source)
+.virtual-scene*.json

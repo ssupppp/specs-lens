@@ -1,0 +1,79 @@
+- !<AssetImportMetadata/26c7d63c-34c5-4175-90ce-fccdecd9cb69>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 5d12cbd7-bf23-44ae-bb71-5a094ff182b0
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 5d12cbd7-bf23-44ae-bb71-5a094ff182b0
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 9217f701-e4c6-4d56-ae1a-acc4f838fcc9
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/9217f701-e4c6-4d56-ae1a-acc4f838fcc9>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  VersionPrerelease: ""
+  UpdateOrder: 0
+  ComponentUid: 36248e6b-d086-46df-ac3d-16ad775ee33a
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    cushion: false
+    cushionMaterial: false
+    cushionSizeCm: false
+    footLengthCm: false
+    footPlantarflexDeg: false
+    legMaterial: false
+    shankLengthCm: false
+    tapMoveCm: false
+    turnDegPerCm: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - legMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      cushionMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      cushion: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      shankLengthCm: !<float> 39.000000
+      footLengthCm: !<float> 25.000000
+      footPlantarflexDeg: !<float> 20.000000
+      tapMoveCm: 1.200000
+      turnDegPerCm: !<float> 5.000000
+      cushionSizeCm: !<Vec3> {x: 62.000000, y: 7.000000, z: 26.000000}
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">HandsOnLegModel – stand-in leg + cushion</span>"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">References</span>"}'
+    - '// @ui {"widget":"group_start", "label":"References"}'
+    - '// @input Asset.Material legMaterial {"hint":"Material for the plain light-grey leg"}'
+    - '// @input Asset.Material cushionMaterial {"hint":"Material for the low cushion under the leg"}'
+    - '// @input SceneObject cushion {"hint":"Authored Cushion SceneObject (sibling of this Leg); its height is fitted under the leg at start"}'
+    - '// @ui {"widget":"group_end"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">Settings</span>"}'
+    - '// @ui {"widget":"group_start", "label":"Settings"}'
+    - '// @input float shankLengthCm = 39 {"hint":"Knee-to-ankle length of the lower leg, cm (knee to heel is about this + 6)", "widget":"slider", "min":30, "max":50, "step":0.5}'
+    - '// @input float footLengthCm = 25 {"hint":"Heel to big-toe tip, cm", "widget":"slider", "min":20, "max":30, "step":0.5}'
+    - '// @input float footPlantarflexDeg = 25 {"hint":"How much the relaxed foot points its toes away from the knee, degrees", "widget":"slider", "min":0, "max":45, "step":1}'
+    - '// @input float tapMoveCm = 1.2 {"hint":"A click that moves less than this (cm) places a palm spot; more turns the leg", "widget":"slider", "min":0.3, "max":4, "step":0.1}'
+    - '// @input float turnDegPerCm = 5 {"hint":"How far the leg turns per cm of drag, degrees", "widget":"slider", "min":1, "max":12, "step":0.5}'
+    - '// @input vec3 cushionSizeCm = {62,7,26} {"hint":"Cushion size W/H/D in cm"}'
+    - '// @ui {"widget":"group_end"}'

@@ -1,0 +1,89 @@
+- !<AssetImportMetadata/fb160d6f-185b-4907-ade6-1f59486160ac>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> b0a229e8-ec3a-4387-88b2-edd33809bc38
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> b0a229e8-ec3a-4387-88b2-edd33809bc38
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> e40bcc5c-6297-40a7-b947-b94468b80502
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/e40bcc5c-6297-40a7-b947-b94468b80502>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  VersionPrerelease: ""
+  UpdateOrder: 0
+  ComponentUid: daeaef1e-8dbd-423b-be67-f823fa3f5f49
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    checkColor: false
+    debugColliders: false
+    dragMaxAngleDeg: false
+    dragMinCm: false
+    guideColor: false
+    guideMaterial: false
+    guideUI: false
+    legModel: false
+    legRig: false
+    placeAtStartPose: false
+    sfxVolume: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - legModel: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      guideUI: !<MappingBased.AssignableType_2> 00000000-0000-0000-0000-000000000000
+      legRig: !<reference.SceneObject> 00000000-0000-0000-0000-000000000000
+      guideMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      placeAtStartPose: true
+      guideColor: !<Vec3> {x: 0.720000, y: 0.870000, z: 1.000000}
+      checkColor: !<Vec3> {x: 0.400000, y: 1.000000, z: 0.550000}
+      sfxVolume: 0.400000
+      dragMinCm: !<float> 5.000000
+      dragMaxAngleDeg: !<float> 30.000000
+      debugColliders: false
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">HandsOnMain – lower-leg massage guide</span>"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">References</span>"}'
+    - '// @ui {"widget":"group_start", "label":"References"}'
+    - '// @input AssignableType_1 legModel {"hint":"HandsOnLegModel on the Leg object (leg shape, clicks and turning)"}'
+    - '// @input AssignableType_2 guideUI {"hint":"HandsOnGuideUI (hint, part choices, technique label)"}'
+    - '// @input SceneObject legRig {"hint":"LegRig: the movable unit holding leg, cushion and guide text"}'
+    - '// @input Asset.Material guideMaterial {"hint":"Additive unlit vertex-colour material used for dots, arrows and ghost hands"}'
+    - '// @ui {"widget":"group_end"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">Settings</span>"}'
+    - '// @ui {"widget":"group_start", "label":"Settings"}'
+    - "// @input bool placeAtStartPose = true {\"hint\":\"Place the LegRig relative to where the user's head is and looks when the Lens starts (its authored offset is kept, the leg stays level)\"}"
+    - '// @input vec3 guideColor = "{0.72, 0.87, 1.0}" {"hint":"Guide colour for palm spots, arrows and ghost hands — light, cool tones only", "widget":"color"}'
+    - '// @input vec3 checkColor = "{0.40, 1.0, 0.55}" {"hint":"Arrow colour while a drag follows the stroke direction", "widget":"color"}'
+    - '// @input float sfxVolume = 0.4 {"hint":"Volume of the click and chime sounds (quiet: content is ~50 cm away)", "widget":"slider", "min":0, "max":1, "step":0.05}'
+    - '// @input float dragMinCm = 4 {"hint":"Drag distance along the arrow before it turns green, cm", "widget":"slider", "min":1, "max":15, "step":0.5}'
+    - '// @input float dragMaxAngleDeg = 30 {"hint":"Maximum angle between the drag and the arrow, degrees", "widget":"slider", "min":5, "max":60, "step":1}'
+    - '// @ui {"widget":"group_end"}'
+    - '// @ui {"widget":"separator"}'
+    - '// @ui {"widget":"label", "label":"<span style=\"color: #60A5FA;\">Debug</span>"}'
+    - '// @ui {"widget":"group_start", "label":"Debug"}'
+    - '// @input bool debugColliders {"hint":"Draw the leg collider as a wireframe (takes effect on preview restart)"}'
+    - '// @ui {"widget":"group_end"}'
