@@ -7,7 +7,8 @@
     - !<own> 11764a65-26c1-4aec-95c4-92b2d17a9e05
     - !<own> b80be69a-a49a-44fc-b37b-cfac550acef2
     - !<own> ee87f30b-bf92-4d94-95ac-f86fc3d4855f
-    - !<own> 2f60f8c4-8a46-49a4-9c1a-902a2c9097f0
+    - !<own> 2a87dd91-91be-4dae-b70e-e75fd7fd93b7
+    - !<own> b8bcc507-f5c1-45f8-a4fe-aa604c232226
   layers: !<Layers/267ee9a7-aff2-4f9d-9a49-f71214747d03>
     userLayers:
       - id: 1
@@ -688,7 +689,7 @@
   Layers: 1
   LocalTransform: !<TransformEntity>
     Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 180.000000, y: 0.000000, z: 0.000000}
     Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
     HasSegmentScaleCompensation: false
   Children:
@@ -750,6 +751,21 @@
     ring-3_end_end_end: !<reference> b93dfa60-41bd-4999-ac0f-4b2f1df2bdaf
     thumb-3_end_end_end_end: !<reference> 08e3cc22-f2e1-49fb-9ddc-145fe6547ce3
     pinky-3_end_end: !<reference> d08269e3-acd4-4156-b5b9-477ca259611d
+- !<SceneObject/2a87dd91-91be-4dae-b70e-e75fd7fd93b7>
+  PrefabRemaps:
+    []
+  Name: LEAF Plugin Bridge
+  Enabled: true
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 809fe020-f802-47a0-8ed0-d407c5d142b4
 - !<ScriptComponent/2b3147e0-3d70-4849-9a4c-4ea79d7c735e>
   PrefabRemaps:
     []
@@ -781,21 +797,6 @@
     - !<own> a7da4af4-3d84-4acd-a31e-920a56b4c5c8
   Components:
     []
-- !<SceneObject/2f60f8c4-8a46-49a4-9c1a-902a2c9097f0>
-  PrefabRemaps:
-    []
-  Name: LEAF Plugin Bridge
-  Enabled: true
-  Layers: 1
-  LocalTransform: !<TransformEntity>
-    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
-    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
-    HasSegmentScaleCompensation: false
-  Children:
-    []
-  Components:
-    - !<own> 7f7da7a7-a2b8-4f04-a3f7-83d7a6a0684b
 - !<RenderMeshVisual/335c5f8b-2917-49e8-8af5-220696e9bc09>
   PrefabRemaps:
     []
@@ -1023,7 +1024,7 @@
       cushion: !<reference.SceneObject> 06e0f6d4-2eec-4da7-aa02-7bb87666d182
       shankLengthCm: !<float> 39.000000
       footLengthCm: !<float> 25.000000
-      footPlantarflexDeg: !<float> 25.000000
+      footPlantarflexDeg: !<float> 75.000000
       tapMoveCm: 1.200000
       turnDegPerCm: !<float> 5.000000
       cushionSizeCm: !<Vec3> {x: 62.000000, y: 7.000000, z: 26.000000}
@@ -1451,6 +1452,30 @@
     []
   Components:
     - !<own> c8e031d3-a8a1-468a-a419-427f8556de4c
+- !<ScriptComponent/79b8f360-c5c7-4e0b-b902-f0ddc5ba419a>
+  PrefabRemaps:
+    []
+  Name: HandsOnPoseLab
+  Enabled: true
+  ScriptAsset: !<reference> ea86f365-6443-43c1-938f-ce123b4b48b4
+  ScriptInputsDefault:
+    {}
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      legModel: !<MappingBased.AssignableType_1> 4aaae98f-b45c-4c88-997c-53066b77b124
+      rightHandPrefab: !<reference.ObjectPrefab> 0d7767d7-4db5-4f00-b58c-bc432f9515a6
+      leftHandPrefab: !<reference.ObjectPrefab> 258ef61e-4937-4902-8753-642123e46194
+      handMaterial: !<reference.Material> e77d583a-aa5f-4413-af9c-acc63e74192a
+      hideWhileOn: !<reference.SceneObject[]>
+        - !<reference> d1fafb52-f1cc-4d28-af85-8c8268e14dea
+      pauseWhileOn: !<reference.ScriptComponent[]>
+        - !<reference> 5c1fb3e8-2e95-4f6c-9985-f752f49ca587
+      gripIndex: !<float> 5.000000
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/7aa85bd8-d423-42cd-b190-473711e94929>
   PrefabRemaps:
     []
@@ -1500,22 +1525,6 @@
     - !<own> 58ef319f-850e-40dd-8295-e6dc36ab4854
   Components:
     []
-- !<ScriptComponent/7f7da7a7-a2b8-4f04-a3f7-83d7a6a0684b>
-  PrefabRemaps:
-    []
-  Name: MessagingBridge
-  Enabled: true
-  ScriptAsset: !<reference> 9aa407db-2872-4afc-a162-cf7faf2a0f29
-  ScriptInputsDefault:
-    {}
-  ScriptTypesDefault:
-    {}
-  ScriptInputs:
-    "":
-      {}
-  ScriptTypes:
-    "":
-      {}
 - !<SceneObject/7fb3591f-54a2-4aee-b07d-fd10d56538c8>
   PrefabRemaps:
     []
@@ -1561,6 +1570,22 @@
     []
   Components:
     - !<own> 335c5f8b-2917-49e8-8af5-220696e9bc09
+- !<ScriptComponent/809fe020-f802-47a0-8ed0-d407c5d142b4>
+  PrefabRemaps:
+    []
+  Name: MessagingBridge
+  Enabled: true
+  ScriptAsset: !<reference> 9aa407db-2872-4afc-a162-cf7faf2a0f29
+  ScriptInputsDefault:
+    {}
+  ScriptTypesDefault:
+    {}
+  ScriptInputs:
+    "":
+      {}
+  ScriptTypes:
+    "":
+      {}
 - !<SceneObject/82a4b4e8-283b-441c-8b94-9fdc50c958f2>
   PrefabRemaps:
     []
@@ -2084,6 +2109,21 @@
     - !<own> 44097eaf-01da-45fb-8973-3bd8172618de
   Components:
     []
+- !<SceneObject/b8bcc507-f5c1-45f8-a4fe-aa604c232226>
+  PrefabRemaps:
+    []
+  Name: PoseLab
+  Enabled: false
+  Layers: 1
+  LocalTransform: !<TransformEntity>
+    Position: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Rotation: {x: 0.000000, y: 0.000000, z: 0.000000}
+    Scale: {x: 1.000000, y: 1.000000, z: 1.000000}
+    HasSegmentScaleCompensation: false
+  Children:
+    []
+  Components:
+    - !<own> 79b8f360-c5c7-4e0b-b902-f0ddc5ba419a
 - !<SceneObject/b93dfa60-41bd-4999-ac0f-4b2f1df2bdaf>
   PrefabRemaps:
     []

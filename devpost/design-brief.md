@@ -7,7 +7,7 @@ status: approved
 <!-- Filled in by plan-lens from the learner's interview. Use the learner's words. Mark any value they didn't choose as (default). -->
 
 ## The one spatial moment
-I'm sitting on the couch with my wife's legs on my lap. I lay one palm just above her ankle and the other just below her knee, pinch "Calf" from the little labels that pop up, and the guide appears right on her leg: an arrow from my first palm to my second, and ghost hands looping the stroke along it, until I pinch for another part or turn it off.
+My wife is lying on her stomach on the bed and I'm beside it, looking down at her leg, so the calf is clearly visible. I lay one palm just above her ankle and the other just below her knee, pinch "Calf" from the little labels that pop up, and the guide appears right on her leg: an arrow from my first palm to my second, and ghost hands looping the stroke along it, until I pinch for another part or turn it off.
 
 ## Why it belongs on glasses
 - Uses: draws in the world (the guide sits on the leg itself, at real size, between the two spots you marked); leaves your body free (both hands stay on the leg, eyes stay on the leg).
@@ -17,14 +17,14 @@ I'm sitting on the couch with my wife's legs on my lap. I lay one palm just abov
 - Type: product. A simple, non-expert guide that teaches basic recovery massage strokes on the lower leg (calf, shin, sole). Framed as fitness / sore-legs recovery, clinical wording only.
 - What the real version would sense: the user's own palms (SPECS hand tracking). The glasses can't see or track another person's leg, so the user places the guide with their hands: first palm = where the stroke starts, second palm = where it ends. The Lens never needs to know the leg's shape. The user tells it which part with a pinch.
 - Stand-ins for the preview:
-  - **The leg:** a life-size virtual lower leg (knee down to foot), plain light grey anatomy-style model, resting across a lap at couch height in a natural pose. Click-and-drag on the leg turns it, the way she'd turn her leg to show the calf, so you can look at it from any side and settle it where you want.
+  - **The leg:** a life-size virtual lower leg (knee down to foot), plain light grey anatomy-style model, lying face down on a bed (calf up, foot relaxed and pointed). Click-and-drag on the leg turns it, the way she'd turn her leg to show the shin or the side, so you can look at it from any side and settle it where you want.
   - **A palm landing on the leg:** a click on the stand-in leg. Two clicks = two palms. On glasses this becomes a palm laid flat on the leg.
   - **Direction check:** the mouse stands in for the hand. Pinch the start of the arrow and drag along it; following the arrow's direction turns it green. On glasses this would become real hand tracking.
 
 ## Where things live
-- Where the user is looking during the main task: down at their lap, at the leg, about 50 cm away and below eye level.
-- Leg: lying sideways across the user's lap (left-right in front of them), knee on one side, foot on the other (default: knee left, foot right). About 45 cm in front of the starting eye position and 40 cm below it (default). Real adult size: knee to heel about 45 cm, foot about 25 cm long (default), with a foot that reads as a real foot (heel, arch, toes), not a flat paddle. Resting on a simple low cushion so it doesn't float (default). Natural pose: no forced roll; the user turns it by dragging.
-- The whole leg is bigger than the SPECS view at lap distance (about 23 x 38 cm at 55 cm). That's fine: what must fit in view is the hint and the active stroke (arrow, ghost hands, label), which sits where the user is looking. When the Lens opens, the middle of the leg and the hint are in view. (default)
+- Where the user is looking during the main task: down at the leg on the bed from above, about 50-60 cm away.
+- Leg: lying face down on the bed in front of the user (left-right in front of them), knee on one side, foot on the other (default: knee left, foot right), calf facing up. Placed where the user is looking when the Lens opens, about 55 cm along their gaze (default). Real adult size: knee to heel about 45 cm, foot about 25 cm long (default), with a foot that reads as a real foot (heel, arch, toes), not a flat paddle. Resting on a simple low cushion that stands in for the bed (default). The user can turn it by dragging.
+- The whole leg is bigger than the SPECS view at this distance (about 23 x 38 cm at 55 cm). That's fine: what must fit in view is the hint and the active stroke (arrow, ghost hands, label), which sits where the user is looking. When the Lens opens, the middle of the leg and the hint are in view. (default)
 - Palm spots: a small soft dot where each palm landed, about 2 cm across (default).
 - Part labels: three short text choices, "Calf · Shin · Sole", in a small row floating about 8 cm above the second palm spot, facing the user (default). Big enough to pinch easily.
 - Arrow: drawn along the leg's surface from the first palm spot to the second, about 3 cm wide (default).
@@ -76,7 +76,7 @@ Feedback is subtle (default), because content sits about 50 cm from the eyes. So
 
 ## Done criteria
 Each one can be checked in Lens Studio's preview.
-1. When the Lens opens, a life-size leg with a real-looking foot rests across a lap about 50 cm in front, slightly below eye level, with the hint "Place your palm where the stroke starts" above it, clear of the foot.
+1. When the Lens opens, a life-size leg with a real-looking foot lies face down on the bed about 50-60 cm away, where the user is looking, with the hint "Place your palm where the stroke starts" above it, clear of the foot.
 2. Click-and-dragging the leg turns it to show another side, and it stays where it's released.
 3. Clicking a spot on the leg, then a second spot, puts a dot on each, and "Calf · Shin · Sole" appear above the second spot.
 4. Pinching "Calf" clears the choices and shows an arrow from the first spot to the second, ghost hands looping the stroke along it, and the label "Calf knead · medium".
@@ -95,7 +95,7 @@ Each one can be checked in Lens Studio's preview.
 - Direction check is a mouse-drag stand-in. On real glasses it would need hand tracking while hands are pressed on a leg, where tracking may drop out. Feel unproven.
 - Once placed, the guide stays put in the room. If she moves her leg, the user re-places it. On glasses this is honest (no leg tracking); it may feel fussy if she moves a lot.
 - Click vs. drag on the stand-in leg (palm spot vs. turning) relies on a small movement threshold; a shaky click could turn the leg instead.
-- The preview camera may start at standing height; to see the "sitting with a lap" view, move down with Q in Interactive Preview, or place the leg relative to the starting camera as described.
+- The preview camera starts looking straight ahead; for the view from above, look down (right-drag in Interactive Preview) before the Lens starts, so the leg is placed under your gaze.
 - Keep the content clinical and fitness-framed (plain grey leg, physio-style labels) so it can't read as anything else.
 - Strokes are generic defaults, not expert-reviewed massage instruction.
 

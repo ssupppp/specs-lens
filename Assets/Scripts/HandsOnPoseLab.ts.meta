@@ -1,0 +1,66 @@
+- !<AssetImportMetadata/72247d7a-d7b5-4adb-b68e-4ee972843d64>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> ea86f365-6443-43c1-938f-ce123b4b48b4
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> ea86f365-6443-43c1-938f-ce123b4b48b4
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> 8711bd6b-7174-4d95-89e9-cb19d427590c
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/8711bd6b-7174-4d95-89e9-cb19d427590c>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  VersionPrerelease: ""
+  UpdateOrder: 0
+  ComponentUid: 16ea69f8-680f-470f-b7f8-2f98621dd465
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    gripIndex: false
+    handMaterial: false
+    hideWhileOn: false
+    leftHandPrefab: false
+    legModel: false
+    pauseWhileOn: false
+    rightHandPrefab: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - legModel: !<MappingBased.AssignableType_1> 00000000-0000-0000-0000-000000000000
+      rightHandPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      leftHandPrefab: !<reference.ObjectPrefab> 00000000-0000-0000-0000-000000000000
+      handMaterial: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      hideWhileOn: !<reference.SceneObject[]>
+        []
+      pauseWhileOn: !<reference.ScriptComponent[]>
+        []
+      gripIndex: !<float> 0.000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input AssignableType_1 legModel {"hint":"HandsOnLegModel on the Leg object"}'
+    - '// @input Asset.ObjectPrefab rightHandPrefab {"hint":"GhostHandR prefab (SIK right hand model)"}'
+    - '// @input Asset.ObjectPrefab leftHandPrefab {"hint":"GhostHandL prefab (SIK left hand model)"}'
+    - '// @input Asset.Material handMaterial {"hint":"Lit material for the ghost hands (cloned, tinted and made additive)"}'
+    - '// @input SceneObject[] hideWhileOn = {} {"hint":"Objects to switch off while the lab is on (e.g. GuideUI)"}'
+    - '// @input Component.ScriptComponent[] pauseWhileOn = {} {"hint":"Script components to pause while the lab is on (e.g. HandsOnMain)"}'
+    - '// @input float gripIndex {"hint":"Which grip to show", "widget":"slider", "min":0, "max":5, "step":1}'
