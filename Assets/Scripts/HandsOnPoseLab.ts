@@ -159,11 +159,11 @@ export class HandsOnPoseLab extends BaseScriptComponent {
     this.show()
   }
 
-  /** Re-pose when the leg has been turned/moved or the user has moved (not mid-drag). */
+  /** Re-pose when the leg has rolled/moved or the user has moved (not mid-roll). */
   private watch(): void {
     if (!this.camera || getTime() - this.lastCheck < REPOSE_CHECK_S) return
     this.lastCheck = getTime()
-    if (this.legModel.isTurning()) return
+    if (this.legModel.isRolling()) return
     const legT = this.legModel.getSceneObject().getTransform()
     const moved =
       legT.getWorldPosition().distance(this.lastLegPos) > REPOSE_MOVE_CM ||

@@ -18,6 +18,9 @@
 
 export type Intensity = "gentle" | "medium" | "firm"
 
+/** How the leg lies on the bed for a part: face down (calf up) or face up (shin up). */
+export type LegPose = "faceDown" | "faceUp"
+
 export interface HandPose {
   /** cm offset along the stroke, relative to the moving stroke point. */
   along: number
@@ -35,6 +38,10 @@ export interface HandPose {
   curlDeg: number
   /** Thumb tip rests on the arrow line, just ahead of the hand; otherwise on the nearest skin. */
   thumbOnArrow: boolean
+  /** How far ahead of the palm (along the stroke) the thumb tip reaches on the arrow line, cm (default 1.5). */
+  thumbLeadCm?: number
+  /** How far to its own side of the arrow line the thumb tip rests, cm (default 0.9). */
+  thumbAcrossCm?: number
 }
 
 export interface SurfaceSpot {
@@ -50,6 +57,8 @@ export interface PartDef {
   /** Floating technique label, e.g. "Calf knead · medium". */
   label: string
   intensity: Intensity
+  /** Position the leg settles into when this part is picked. */
+  pose: LegPose
   /** Plain-language hand cue (for humans editing this list; not rendered). */
   cue: string
   hands: HandPose[]
@@ -70,10 +79,11 @@ export const PARTS: PartDef[] = [
     name: "Calf",
     label: "Calf knead · medium",
     intensity: "medium",
-    cue: "Both hands wrapped around the calf, thumbs on the back of the leg; glide along the arrow (ankle to knee).",
+    pose: "faceDown",
+    cue: "Palms hug the sides of the calf, fingers pointing up toward the knee; both thumbs side by side on the centre line, gliding along the arrow (ankle to knee).",
     hands: [
-      {along: 0, aroundDeg: -48, fingerYawDeg: -95, curlDeg: 95, thumbOnArrow: true},
-      {along: 0, aroundDeg: 48, fingerYawDeg: 95, curlDeg: 95, thumbOnArrow: true},
+      {along: -4, aroundDeg: -62, fingerYawDeg: -8, curlDeg: 60, thumbOnArrow: true, thumbLeadCm: 7, thumbAcrossCm: 1.5},
+      {along: -4, aroundDeg: 62, fingerYawDeg: 8, curlDeg: 60, thumbOnArrow: true, thumbLeadCm: 7, thumbAcrossCm: 1.5},
     ],
     suggested: {start: {region: "leg", a: 31, b: 180}, end: {region: "leg", a: 9, b: 180}},
   },
@@ -82,6 +92,7 @@ export const PARTS: PartDef[] = [
     name: "Shin",
     label: "Shin glide · gentle",
     intensity: "gentle",
+    pose: "faceUp",
     cue: "Palms flat on either side of the shinbone (not on the bone); glide along the arrow (ankle to knee).",
     hands: [
       {along: -1.5, aroundDeg: -55, fingerYawDeg: 0, curlDeg: 35, thumbOnArrow: false},
@@ -94,6 +105,7 @@ export const PARTS: PartDef[] = [
     name: "Sole",
     label: "Sole thumb glide · medium",
     intensity: "medium",
+    pose: "faceDown",
     cue: "Both thumbs on the sole; glide along the arrow (heel to toes).",
     hands: [
       {along: -1, aroundDeg: -90, fingerYawDeg: -110, curlDeg: 95, thumbOnArrow: true},

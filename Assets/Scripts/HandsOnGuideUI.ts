@@ -530,7 +530,8 @@ export class HandsOnGuideUI extends BaseScriptComponent {
     const toCam = this.camTransform.getWorldPosition().sub(t.getWorldPosition())
     if (toCam.length < 0.001) return
     const fwd = toCam.normalize()
-    let rot = quat.lookAt(fwd, vec3.up())
+    // the camera's up (not the world's) keeps text upright on screen when looking down at the bed
+    let rot = quat.lookAt(fwd, this.camTransform.up)
     // lookAt convention guard: the text's +Z (readable side) must point at the camera
     if (rot.multiplyVec3(vec3.forward()).dot(fwd) < 0) rot = rot.multiply(quat.angleAxis(Math.PI, vec3.up()))
     t.setWorldRotation(rot)

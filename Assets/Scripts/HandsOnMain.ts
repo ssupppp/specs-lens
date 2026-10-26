@@ -2,10 +2,10 @@
  * HandsOnMain — orchestrates the HandsOn lower-leg massage guide.
  *
  * Owns (single source of truth): the current step, the palm spots, the chosen part, and the
- * placed guide. Flow:
- *   placeStart --tap leg--> placeEnd --tap leg--> pickPart --pinch a part--> guide
- *   guide --pinch label--> pickPart (+ "Off") --part--> placeStart (part remembered) ... --> guide
- *                                             --Off--> placeStart (guide + spots fade out)
+ * placed guide. Flow (a part is always picked before its palms are placed):
+ *   pickPart --pinch a part--> placeStart (leg rolls to the part's position) --tap leg--> placeEnd --tap leg--> guide
+ *   guide --pinch label--> pickPart (+ "Off") --part--> placeStart ... --> guide
+ *                                             --Off--> pickPart (guide + spots fade out)
  * Also: start-pose placement of the leg rig and the click/chime sounds.
  * Expects (@input): legModel (HandsOnLegModel on "Leg"), guideUI (HandsOnGuideUI),
  *   legRig (the movable "LegRig" unit), guideMaterial (additive unlit, vertex colour),
@@ -15,7 +15,7 @@
  * Observable state for tests: getStep(), getSpotCount(), getSpotPositions(), areChoicesVisible(),
  * getChoiceOptions(), getChosenPartId(), getPendingPartId(), getLabelText(), isGuideVisible(),
  * getArrowStart(), getArrowEnd(), getArrowDirection(), isArrowGreen(), getHintText(),
- * isHintVisible(), getLegTurnDeg(), getLegRotation(), getSuggestedSpotWorld(), tapLegAt().
+ * isHintVisible(), getLegPose(), isLegRolling(), getLegRotation(), getSuggestedSpotWorld(), tapLegAt().
  * Size: ~100 lines are the read-only test getters; the flow itself is the "the flow" section.
  */
 import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/CameraProvider/WorldCameraFinderProvider"
@@ -23,7 +23,7 @@ import {HandsOnGuide} from "./HandsOnGuide"
 import {HandsOnGuideUI} from "./HandsOnGuideUI"
 import {HandsOnLegModel, LegTap} from "./HandsOnLegModel"
 import {StrokePath, toVec3} from "./HandsOnLegGeometry"
-import {OFF_CHOICE_ID, OFF_CHOICE_NAME, PARTS, PartDef, findPart} from "./HandsOnParts"
+import {LegPose, OFF_CHOICE_ID, OFF_CHOICE_NAME, PARTS, PartDef, findPart} from "./HandsOnParts"
 import {HandsOnSpots} from "./HandsOnSpots"
 
 const SFX_CLICK = requireAsset("../GeneratedSFX/HandsOnZoneOn.wav") as AudioTrackAsset
@@ -38,8 +38,12 @@ const HINT_TEXT: Record<Exclude<Step, "guide">, string> = {
   pickPart: "Pick the part",
 }
 const HINT_ABOVE_LEG_CM = 10
-const CHOICES_ABOVE_SPOT_CM = 8
-const LABEL_ABOVE_ARROW_CM = 8
+/** Where the calf's middle sits along the shank, knee (0) to ankle (1). */
+const CALF_MIDDLE_FRACTION = 0.4
+const CHOICES_ABOVE_LEG_CM = 8
+/** The technique label sits past the arrowhead (off the hands, like a caption at the top of the view). */
+const LABEL_AHEAD_CM = 7
+const LABEL_LIFT_CM = 2
 const SPOT_DIAMETER_CM = 2
 const GHOST_HAND_STRENGTH = 0.6
 /** Ghost hands: light blue, lit (they're see-through, so the light leg shows through them). */
@@ -87,8 +91,13 @@ export class HandsOnMain extends BaseScriptComponent {
   @ui.label('<span style="color: #60A5FA;">Settings</span>')
   @ui.group_start("Settings")
   @input
-  @hint("Place the LegRig relative to where the user's head is and looks when the Lens starts (its authored offset is kept, the leg stays level)")
+  @hint("When the Lens starts, place the LegRig so the middle of the calf sits where the user looks (the rig keeps its authored yaw relative to the head and stays level)")
   placeAtStartPose: boolean = true
+
+  @input
+  @hint("How far along the gaze the middle of the calf is placed at start, cm")
+  @widget(new SliderWidget(40, 100, 1))
+  focusDistanceCm: number = 60
 
   @input("vec3", "{0.72, 0.87, 1.0}")
   @hint("Guide colour for palm spots and arrows — light, cool tones only")
@@ -124,9 +133,10 @@ export class HandsOnMain extends BaseScriptComponent {
   debugColliders: boolean = false
   @ui.group_end
 
-  private step: Step = "placeStart"
+  private step: Step = "pickPart"
+  /** Part whose guide is showing. */
   private chosen: PartDef | null = null
-  /** Part picked from the reopened choices, waiting for two new spots. */
+  /** Part picked, waiting for its two palm spots. */
   private pending: PartDef | null = null
   private guide: HandsOnGuide | null = null
   private oldGuides: HandsOnGuide[] = []
@@ -137,7 +147,6 @@ export class HandsOnMain extends BaseScriptComponent {
   private sfxClick: AudioComponent
   private sfxOff: AudioComponent
   private sfxChime: AudioComponent
-  private rigLocalPos: vec3
   private rigLocalRot: quat
   private placed = false
   private elapsed = 0
@@ -148,7 +157,6 @@ export class HandsOnMain extends BaseScriptComponent {
       return
     }
     const rt = this.legRig.getTransform()
-    this.rigLocalPos = rt.getLocalPosition()
     this.rigLocalRot = rt.getLocalRotation()
 
     // world-locked content (spots, guides) lives outside the rig so turning the leg never moves it
@@ -188,7 +196,7 @@ export class HandsOnMain extends BaseScriptComponent {
     return this.chosen ? this.chosen.id : ""
   }
 
-  /** Part waiting for two new spots after being picked from the reopened choices ("" when none). */
+  /** Part picked and waiting for its two palm spots ("" when none). */
   getPendingPartId(): string {
     return this.pending ? this.pending.id : ""
   }
@@ -226,9 +234,13 @@ export class HandsOnMain extends BaseScriptComponent {
     return this.guideUI.isHintVisible()
   }
 
-  /** Accumulated leg turn from dragging: x = yaw, y = roll, degrees. */
-  getLegTurnDeg(): vec2 {
-    return this.legModel.getTurnDeg()
+  /** How the leg lies (or is rolling toward): face down or face up. */
+  getLegPose(): LegPose {
+    return this.legModel.getPose()
+  }
+
+  isLegRolling(): boolean {
+    return this.legModel.isRolling()
   }
 
   getLegRotation(): quat {
@@ -275,8 +287,8 @@ export class HandsOnMain extends BaseScriptComponent {
     this.guideUI.onLabelPinched.add(() => this.onLabelPinched())
 
     if (this.debugColliders) this.setColliderDebugAll(this.legModel.getSceneObject(), true)
-    this.setStep("placeStart")
-    console.log("[HandsOn] ready — click the leg where the stroke starts")
+    this.setStep("pickPart")
+    console.log("[HandsOn] ready — pick the part")
   }
 
 
@@ -294,7 +306,7 @@ export class HandsOnMain extends BaseScriptComponent {
 
   private onLegTap(tap: LegTap): void {
     if (this.step !== "placeStart" && this.step !== "placeEnd") return
-    if (!this.debounce()) return
+    if (this.legModel.isRolling() || !this.debounce()) return
     this.spots.add(tap.position, tap.normal)
     this.play(this.sfxClick)
     if (this.step === "placeStart") {
@@ -303,44 +315,34 @@ export class HandsOnMain extends BaseScriptComponent {
       return
     }
     console.log("[HandsOn] spot 2 at " + tap.position.toString())
-    if (this.pending) {
-      const part = this.pending
-      this.pending = null
-      this.startGuide(part)
-    } else {
-      this.setStep("pickPart", false)
-    }
+    const part = this.pending
+    this.pending = null
+    if (part) this.startGuide(part)
   }
 
   private onChoice(id: string): void {
     if (this.step !== "pickPart") return
     this.lastActionTime = this.elapsed
+    // any choice replaces what was there: old guide and spots fade out
+    this.retireGuide()
+    this.chosen = null
+    this.pending = null
+    this.spots.clear()
+    this.guideUI.hideLabel()
     if (id === OFF_CHOICE_ID) {
-      this.retireGuide()
-      this.chosen = null
-      this.pending = null
-      this.spots.clear()
-      this.guideUI.hideLabel()
       this.play(this.sfxOff)
       console.log("[HandsOn] guide off")
-      this.setStep("placeStart")
+      this.setStep("pickPart")
       return
     }
     const part = findPart(id)
     if (!part) return
     this.play(this.sfxClick)
-    if (this.guide || this.chosen) {
-      // switching from a running guide: a different part sits in a different place, so ask for two new spots
-      this.retireGuide()
-      this.chosen = null
-      this.spots.clear()
-      this.guideUI.hideLabel()
-      this.pending = part
-      console.log("[HandsOn] switching to " + part.id + " — waiting for two new spots")
-      this.setStep("placeStart")
-      return
-    }
-    this.startGuide(part)
+    // the leg settles into the part's position (she rolls over for the shin), then two palms place the stroke
+    this.legModel.setPose(part.pose)
+    this.pending = part
+    console.log("[HandsOn] picked " + part.id + " (" + part.pose + ") — waiting for two spots")
+    this.setStep("placeStart")
   }
 
   private onLabelPinched(): void {
@@ -377,7 +379,7 @@ export class HandsOnMain extends BaseScriptComponent {
     guide.onDirectionMatched = () => this.play(this.sfxChime)
     this.guide = guide
     this.chosen = part
-    this.guideUI.showLabel(part.label, this.keepInView(guide.labelAnchorWorld(LABEL_ABOVE_ARROW_CM), this.guideUI.getLabelWidthCm() / 2))
+    this.guideUI.showLabel(part.label, this.keepInView(guide.aheadAnchorWorld(LABEL_AHEAD_CM, LABEL_LIFT_CM), this.guideUI.getLabelWidthCm() / 2))
     console.log("[HandsOn] guide on: " + part.id + " (" + part.label + "), arrow " + path.length.toFixed(1) + " cm")
     this.setStep("guide")
   }
@@ -405,12 +407,10 @@ export class HandsOnMain extends BaseScriptComponent {
 
   // ── placement ──
 
-  /** ~8 cm above the second palm spot; when reopened from the label, above the label instead. */
+  /** ~8 cm above the middle of the leg; when reopened from the label, above the label instead. */
   private choicesWorldPosition(fromLabel: boolean): vec3 {
     if (fromLabel) return this.guideUI.getLabelWorldPosition().add(new vec3(0, 4, 0))
-    const pts = this.spots.positions()
-    const anchor = pts.length > 0 ? pts[pts.length - 1] : this.legTopWorld()
-    return anchor.add(new vec3(0, CHOICES_ABOVE_SPOT_CM, 0))
+    return this.legTopWorld().add(new vec3(0, CHOICES_ABOVE_LEG_CM, 0))
   }
 
   /** ~10 cm above the middle of the leg (clear of the foot); raised if the choice row sits there. */
@@ -435,6 +435,13 @@ export class HandsOnMain extends BaseScriptComponent {
     return this.camera.getWorldTransform().multiplyPoint(new vec3(x, local.y, local.z))
   }
 
+  /** Middle of the calf on the leg's axis, world space. */
+  private calfMiddleWorld(): vec3 {
+    const shape = this.legModel.shape
+    const m = this.legModel.getSceneObject().getTransform().getWorldTransform()
+    return m.multiplyPoint(toVec3(shape.legAxis(shape.params.shankLengthCm * CALF_MIDDLE_FRACTION)))
+  }
+
   /** Highest point of the shank's middle ring, world space. */
   private legTopWorld(): vec3 {
     const shape = this.legModel.shape
@@ -456,18 +463,21 @@ export class HandsOnMain extends BaseScriptComponent {
         const dir = flat.normalize()
         const base = new vec3(0, 0, -1)
         const yaw = dir.dot(base) < -0.999 ? quat.angleAxis(Math.PI, vec3.up()) : quat.rotationFromTo(base, dir)
-        // the offset also follows where the head is looking up/down (someone already looking at
-        // their lap gets the leg in their lap); the leg itself stays level
-        const pitch = Math.max(-50, Math.min(10, (Math.asin(Math.max(-1, Math.min(1, look.normalize().y))) * 180) / Math.PI))
+        // the middle of the calf goes where the head is looking (looking down at the bed puts it
+        // on the bed below); the leg itself stays level
+        const pitch = Math.max(-80, Math.min(10, (Math.asin(Math.max(-1, Math.min(1, look.normalize().y))) * 180) / Math.PI))
         const aim = yaw.multiply(quat.angleAxis((pitch * Math.PI) / 180, vec3.right()))
+        const target = cam.getWorldPosition().add(aim.multiplyVec3(new vec3(0, 0, -this.focusDistanceCm)))
         const rt = this.legRig.getTransform()
-        rt.setWorldPosition(cam.getWorldPosition().add(aim.multiplyVec3(this.rigLocalPos)))
         rt.setWorldRotation(yaw.multiply(this.rigLocalRot))
-        console.log("[HandsOn] leg placed relative to start pose at " + rt.getWorldPosition().toString())
+        rt.setWorldPosition(target)
+        rt.setWorldPosition(target.add(target.sub(this.calfMiddleWorld())))
+        console.log("[HandsOn] leg placed with mid-calf at " + this.calfMiddleWorld().toString())
       }
     }
-    // re-anchor the hint now that the leg is where it will stay
-    if (this.step !== "guide") this.guideUI.showHint(HINT_TEXT[this.step], this.hintWorldPosition())
+    // re-anchor the choices and hint now that the leg is where it will stay
+    if (this.step === "pickPart" && !this.guide) this.setStep("pickPart")
+    else if (this.step !== "guide") this.guideUI.showHint(HINT_TEXT[this.step], this.hintWorldPosition())
   }
 
   // ── audio ──

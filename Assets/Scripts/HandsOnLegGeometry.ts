@@ -47,6 +47,11 @@ function lerpTable(xs: number[], ys: number[], x: number): number {
   return ys[ys.length - 1]
 }
 
+/** How far the calf's two heads widen the leg to each side at their fullest, cm. */
+const CALF_SIDE_BULGE_CM = 1.6
+/** The leg carries on this far above the knee (the start of the thigh) before its rounded end, so seen from above it runs off the view instead of ending in a cap. */
+const THIGH_STUB_CM = 14
+
 /** Signed power used by superellipse cross-sections. */
 const spow = (v: number, p: number) => Math.sign(v) * Math.pow(Math.abs(v), p)
 
@@ -127,9 +132,16 @@ export class LegShape {
     // a little wider side to side, ankle bones near the bottom
     const side = Math.sin(th)
     r *= 1 + 0.07 * side * side
+    // the calf's two heads swell out to the sides in the upper third (inner head a bit lower and
+    // larger), so the calf reads as a calf seen from behind, not a tube
+    const behind = 0.675 - 0.325 * Math.tanh(3 * Math.cos(th)) // ~1 at the back, ~0.35 at the shin, smooth between
+    const head = side > 0 ? Math.exp(-Math.pow((s - 0.36) / 0.2, 2)) : 0.85 * Math.exp(-Math.pow((s - 0.3) / 0.18, 2))
+    r += CALF_SIDE_BULGE_CM * head * side * side * behind
     r += 0.55 * Math.exp(-Math.pow((s - 0.97) / 0.045, 2)) * Math.pow(Math.abs(side), 6)
-    // rounded caps: knee end (a < 0) and ankle end (a > L, hidden inside the foot)
-    if (a < 0) r *= Math.sqrt(Math.max(0, 1 - Math.pow(a / 4.0, 2)))
+    // above the knee the leg widens a little into the thigh, then ends in a rounded cap
+    if (a < 0) r += 0.08 * Math.min(-a, THIGH_STUB_CM)
+    if (a < -THIGH_STUB_CM) r *= Math.sqrt(Math.max(0, 1 - Math.pow((a + THIGH_STUB_CM) / 4.0, 2)))
+    // ankle end (a > L) is a rounded cap hidden inside the foot
     if (a > L) r *= Math.sqrt(Math.max(0, 1 - Math.pow((a - L) / 3.0, 2)))
     return r
   }
@@ -141,7 +153,7 @@ export class LegShape {
   }
 
   legAxis(a: number): V3 {
-    return [this.kneeX + clamp(a, 0, this.params.shankLengthCm), 0, 0]
+    return [this.kneeX + clamp(a, -THIGH_STUB_CM, this.params.shankLengthCm), 0, 0]
   }
 
   legSample(a: number, thetaDeg: number): SurfaceSample {
@@ -212,7 +224,7 @@ export class LegShape {
   /** Nearest point on the leg/foot surface (toes are treated as part of the foot body). */
   project(p: V3): SurfaceSample {
     const L = this.params.shankLengthCm
-    const a = clamp(p[0] - this.kneeX, -3.5, L + 1.0)
+    const a = clamp(p[0] - this.kneeX, -THIGH_STUB_CM - 3.5, L + 1.0)
     const th = Math.atan2(p[2], p[1]) / DEG
     const leg = this.legSample(a, th)
 
@@ -413,10 +425,11 @@ const WHITE: RGBA = [1, 1, 1, 1]
 export function buildLegMesh(shape: LegShape): MeshBuilder {
   const acc = new MeshAccumulator()
   const L = shape.params.shankLengthCm
-  // shank rings: knee cap (a<0) .. ankle cap (a>L)
+  // shank rings: thigh-end cap (a < -THIGH_STUB_CM) .. ankle cap (a>L)
+  const T = THIGH_STUB_CM
   const aVals: number[] = []
-  for (let k = 0; k <= 8; k++) aVals.push(-4 + 4 * Math.sin((k / 8) * Math.PI * 0.5))
-  for (let a = 1; a < L; a += 1) aVals.push(a)
+  for (let k = 0; k <= 8; k++) aVals.push(-T - 4 + 4 * Math.sin((k / 8) * Math.PI * 0.5))
+  for (let a = -T + 1; a < L; a += 1) aVals.push(a)
   for (let k = 0; k <= 8; k++) aVals.push(L + 3 * Math.sin((k / 8) * Math.PI * 0.5))
   const thetaSteps = 48
   const rows: V3[][] = aVals.map((a) => {
@@ -426,7 +439,7 @@ export function buildLegMesh(shape: LegShape): MeshBuilder {
   })
   acc.addGrid(rows, true, (i, p) => {
     const a = aVals[i]
-    if (a <= -3.9) return [-1, 0, 0]
+    if (a <= -T - 3.9) return [-1, 0, 0]
     if (a >= L + 2.9) return [1, 0, 0]
     return sub(p, shape.legAxis(a))
   }, () => WHITE)

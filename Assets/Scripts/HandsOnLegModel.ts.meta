@@ -35,8 +35,6 @@
     footPlantarflexDeg: false
     legMaterial: false
     shankLengthCm: false
-    tapMoveCm: false
-    turnDegPerCm: false
   ScriptTypesHidden:
     {}
   ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
@@ -52,8 +50,6 @@
       shankLengthCm: !<float> 39.000000
       footLengthCm: !<float> 25.000000
       footPlantarflexDeg: !<float> 20.000000
-      tapMoveCm: 1.200000
-      turnDegPerCm: !<float> 5.000000
       cushionSizeCm: !<Vec3> {x: 62.000000, y: 7.000000, z: 26.000000}
   ScriptTypes:
     -
@@ -73,7 +69,5 @@
     - '// @input float shankLengthCm = 39 {"hint":"Knee-to-ankle length of the lower leg, cm (knee to heel is about this + 6)", "widget":"slider", "min":30, "max":50, "step":0.5}'
     - '// @input float footLengthCm = 25 {"hint":"Heel to big-toe tip, cm", "widget":"slider", "min":20, "max":30, "step":0.5}'
     - '// @input float footPlantarflexDeg = 25 {"hint":"How much the relaxed foot points its toes away from the knee, degrees", "widget":"slider", "min":0, "max":45, "step":1}'
-    - '// @input float tapMoveCm = 1.2 {"hint":"A click that moves less than this (cm) places a palm spot; more turns the leg", "widget":"slider", "min":0.3, "max":4, "step":0.1}'
-    - '// @input float turnDegPerCm = 5 {"hint":"How far the leg turns per cm of drag, degrees", "widget":"slider", "min":1, "max":12, "step":0.5}'
     - '// @input vec3 cushionSizeCm = {62,7,26} {"hint":"Cushion size W/H/D in cm"}'
     - '// @ui {"widget":"group_end"}'

@@ -42,7 +42,7 @@ const DEG = Math.PI / 180
 const POSE_KEYS = 6
 /** Fingers set within this angle of the stroke point that way; beyond it they wrap the limb. */
 const WRAP_YAW_DEG = 45
-/** Thumbs on the arrow rest this far ahead of the palm, either side of the line. */
+/** Thumbs on the arrow rest this far ahead of the palm (unless the grip sets thumbLeadCm), either side of the line. */
 const THUMB_LEAD_CM = 1.5
 const THUMB_ACROSS_CM = 0.9
 const ARROW_WIDTH_CM = 3
@@ -184,14 +184,20 @@ export class HandsOnGuide {
     return this.root.getTransform().getWorldTransform().multiplyDirection(this.strokeDirLocal).normalize()
   }
 
-  /** Where the technique label goes: `heightCm` above the arrow's middle, clear of the leg under it. */
-  labelAnchorWorld(heightCm: number): vec3 {
-    const mid = this.path.at(0.5)
+  /**
+   * Past the arrowhead: `aheadCm` beyond the stroke's end along its direction, `liftCm` above the
+   * top of the leg there. Seen from above this keeps the text clear of the hands for most of the loop.
+   */
+  aheadAnchorWorld(aheadCm: number, liftCm: number): vec3 {
+    const end = this.path.at(1)
     const m = this.root.getTransform().getWorldTransform()
-    const midW = m.multiplyPoint(toVec3(mid.p))
-    let top = midW.y
-    for (const p of this.path.shape.ringAround(this.path.shape.project(mid.p))) top = Math.max(top, m.multiplyPoint(toVec3(p)).y)
-    return new vec3(midW.x, top + heightCm, midW.z)
+    const endW = m.multiplyPoint(toVec3(end.p))
+    const t = m.multiplyDirection(toVec3(end.t))
+    const dir = new vec3(t.x, 0, t.z).normalize()
+    let top = endW.y
+    for (const p of this.path.shape.ringAround(this.path.shape.project(end.p))) top = Math.max(top, m.multiplyPoint(toVec3(p)).y)
+    const at = endW.add(dir.uniformScale(aheadCm))
+    return new vec3(at.x, top + liftCm, at.z)
   }
 
   update(dt: number): void {
@@ -278,12 +284,12 @@ export class HandsOnGuide {
       const s = Math.max(0, Math.min(1, prog + pose.along / len))
       const o = this.path.offset(s, 0, 0)
       const yaw = (pose.fingerYawDeg + (this.flipFingers[i] ? 180 : 0)) * DEG
-      const thumbS = Math.max(0, Math.min(1, s + THUMB_LEAD_CM / len))
+      const thumbS = Math.max(0, Math.min(1, s + (pose.thumbLeadCm ?? THUMB_LEAD_CM) / len))
       return {
         palm: this.aroundArrow(o, pose.aroundDeg),
         fingers: Math.abs(pose.fingerYawDeg) > WRAP_YAW_DEG ? undefined : add(scale(o.t, Math.cos(yaw)), scale(o.right, Math.sin(yaw))),
         fingersFixed: true,
-        thumbTarget: pose.thumbOnArrow ? this.path.offset(thumbS, Math.sign(pose.aroundDeg) * THUMB_ACROSS_CM, 0).p : undefined,
+        thumbTarget: pose.thumbOnArrow ? this.path.offset(thumbS, Math.sign(pose.aroundDeg) * (pose.thumbAcrossCm ?? THUMB_ACROSS_CM), 0).p : undefined,
         maxCurlDeg: pose.curlDeg,
       }
     })

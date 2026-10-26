@@ -1,11 +1,11 @@
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {findSceneObjectByName, sleep} from "Leaf.lspkg/Utils/common/Utils"
-import {HandsOnLeafInteractor, getMain, log, resetToStart, v, waitFrames} from "./HandsOnTestKit"
+import {HandsOnLeafInteractor, PALM_HINT, getMain, log, resetToStart, v, visibleSpot, waitFrames} from "./HandsOnTestKit"
 
 /**
- * Criterion 3 — two real SIK taps on the leg put a dot on each, and "Calf · Shin · Sole"
- * appear above spot 2.
+ * Criterion 3 — after picking a part (real SIK pinch) the hint asks for the first palm; two
+ * real SIK taps on the leg put a dot on each.
  */
 @component
 export class HandsOnC3SpotsScenario extends Scenario {
@@ -16,11 +16,18 @@ export class HandsOnC3SpotsScenario extends Scenario {
     await resetToStart(main, ix)
     expect(main.getSpotCount()).toBe(0)
 
-    // two spots on the camera-facing side, spot 2 near the middle of the view so the row's
-    // keep-in-view clamp (HandsOnMain.keepInView) doesn't shift it sideways
-    const lm = main.legModel
-    const aim1 = lm.surfaceToWorld("leg", 33, 40).position
-    const aim2 = lm.surfaceToWorld("leg", 24, 40).position
+    // a tap before picking a part places nothing
+    await ix.tapLeg(visibleSpot(main, "calf", 0))
+    expect(main.getSpotCount(), "spots before a part is picked").toBe(0)
+
+    await ix.pickPart(main, "Calf")
+    expect(main.getStep()).toBe("placeStart")
+    expect(main.getPendingPartId()).toBe("calf")
+    expect(main.getHintText()).toBe(PALM_HINT)
+    expect(main.areChoicesVisible(), "choices after pick").toBe(false)
+
+    const aim1 = visibleSpot(main, "calf", 0)
+    const aim2 = visibleSpot(main, "calf", 1)
     const hit1 = await ix.tapLeg(aim1)
     expect(main.getSpotCount(), "spots after tap 1").toBe(1)
     expect(main.getStep()).toBe("placeEnd")
@@ -42,25 +49,7 @@ export class HandsOnC3SpotsScenario extends Scenario {
       expect(dot.isEnabledInHierarchy, name + " enabled").toBe(true)
       expect(isNull(dot.getComponent("Component.RenderMeshVisual")), name + " has a mesh").toBe(false)
     }
-
-    // choices
-    expect(main.getStep()).toBe("pickPart")
-    expect(main.areChoicesVisible()).toBe(true)
-    expect(main.getChoiceOptions().join(" · ")).toBe("Calf · Shin · Sole")
-    for (const name of ["Choice_Calf", "Choice_Shin", "Choice_Sole"]) {
-      const so = findSceneObjectByName(name)
-      expect(so && so.isEnabledInHierarchy, name + " enabled").toBe(true)
-    }
-    const off = findSceneObjectByName("Choice_Off")
-    expect(!!off && off.isEnabledInHierarchy, "Off chip shown on first pick").toBe(false)
-
-    const row = findSceneObjectByName("Choice_Shin").getTransform().getWorldPosition()
-    const above = row.y - spots[1].y
-    const flat = new vec3(row.x - spots[1].x, 0, row.z - spots[1].z).length
-    log("C3: choice row centre " + v(row) + " above spot2 by " + above.toFixed(1) + " cm, horizontal offset " + flat.toFixed(1) + " cm")
-    expect(above, "choices height above spot 2 (cm)").toBeGreaterThan(4)
-    expect(above, "choices height above spot 2 (cm)").toBeLessThan(14)
-    expect(flat, "choices horizontal offset from spot 2 (cm)").toBeLessThan(3)
+    expect(main.areChoicesVisible(), "no choices after the second spot").toBe(false)
     log("C3: PASS")
   }
 }

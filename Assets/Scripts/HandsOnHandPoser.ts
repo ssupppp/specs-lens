@@ -305,19 +305,27 @@ export class HandsOnHandPoser {
       target = d <= reach * 0.85 ? want : onSkin(base.add(want.sub(base).uniformScale((reach * 0.85) / d)))
     }
     const rest = chain.map((o) => o.getTransform().getLocalRotation())
+    const sunk = () => chain.slice(1).concat([tip]).some((o) => this.skinDistance(pos(o)) < 0.3)
     this.aimThumb(chain, tip, target)
-    // a thumb that had to pass through the leg to get there rests on the nearest skin instead
-    if (chain.slice(1).concat([tip]).some((o) => this.skinDistance(pos(o)) < 0.3)) {
+    if (sunk()) {
+      // a straight reach cuts through a round limb: follow the skin instead, the middle of the
+      // thumb to a point on the skin partway there, then the end joint on to the target
+      chain.forEach((o, k) => o.getTransform().setLocalRotation(rest[k]))
+      this.aimThumb([chain[0], chain[1]], chain[2], onSkin(vec3.lerp(base, target, 0.6)))
+      this.aimThumb([chain[2]], tip, target)
+    }
+    // a thumb that still has to pass through the leg to get there rests on the nearest skin instead
+    if (sunk()) {
       chain.forEach((o, k) => o.getTransform().setLocalRotation(rest[k]))
       this.aimThumb(chain, tip, onSkin(pos(tip)))
     }
   }
 
-  /** Cyclic joint-by-joint aiming of the thumb tip at a point (tip joint first), a little at a time per joint. */
+  /** Cyclic joint-by-joint aiming of the end of `chain` (at `tip`) at a point, last joint first, a little at a time per joint. */
   private aimThumb(chain: SceneObject[], tip: SceneObject, target: vec3): void {
     const maxStep = 20 * DEG
     for (let iter = 0; iter < 8; iter++) {
-      for (let k = 2; k >= 0; k--) {
+      for (let k = chain.length - 1; k >= 0; k--) {
         const jt = chain[k].getTransform()
         const jp = jt.getWorldPosition()
         let q = quat.rotationFromTo(tip.getTransform().getWorldPosition().sub(jp).normalize(), target.sub(jp).normalize())

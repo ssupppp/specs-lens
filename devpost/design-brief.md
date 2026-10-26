@@ -7,7 +7,7 @@ status: approved
 <!-- Filled in by plan-lens from the learner's interview. Use the learner's words. Mark any value they didn't choose as (default). -->
 
 ## The one spatial moment
-My wife is lying on her stomach on the bed and I'm beside it, looking down at her leg, so the calf is clearly visible. I lay one palm just above her ankle and the other just below her knee, pinch "Calf" from the little labels that pop up, and the guide appears right on her leg: an arrow from my first palm to my second, and ghost hands looping the stroke along it, until I pinch for another part or turn it off.
+My wife is lying on her stomach on the bed and I'm beside it, looking down at her leg, so the calf is clearly visible. I pinch "Calf" from the little labels floating over her leg, lay one palm just above her ankle and the other just below her knee, and the guide appears right on her leg: an arrow from my first palm to my second, and ghost hands looping the stroke along it, until I pinch for another part or turn it off. For the shin she rolls onto her back first.
 
 ## Why it belongs on glasses
 - Uses: draws in the world (the guide sits on the leg itself, at real size, between the two spots you marked); leaves your body free (both hands stay on the leg, eyes stay on the leg).
@@ -15,30 +15,29 @@ My wife is lying on her stomach on the bed and I'm beside it, looking down at he
 
 ## Product or overlay
 - Type: product. A simple, non-expert guide that teaches basic recovery massage strokes on the lower leg (calf, shin, sole). Framed as fitness / sore-legs recovery, clinical wording only.
-- What the real version would sense: the user's own palms (SPECS hand tracking). The glasses can't see or track another person's leg, so the user places the guide with their hands: first palm = where the stroke starts, second palm = where it ends. The Lens never needs to know the leg's shape. The user tells it which part with a pinch.
+- What the real version would sense: the user's own palms (SPECS hand tracking). The glasses can't see or track another person's leg, so the user tells it which part with a pinch, then places the guide with their hands: first palm = where the stroke starts, second palm = where it ends. The Lens never needs to know the leg's shape.
 - Stand-ins for the preview:
-  - **The leg:** a life-size virtual lower leg (knee down to foot), plain light grey anatomy-style model, lying face down on a bed (calf up, foot relaxed and pointed). Click-and-drag on the leg turns it, the way she'd turn her leg to show the shin or the side, so you can look at it from any side and settle it where you want.
+  - **The leg:** a life-size virtual lower leg (knee down to foot), plain light grey anatomy-style model, lying on a bed in one of two fixed positions set by the part picked: **face down** for Calf and Sole (calf up, foot relaxed and pointed), **face up** for Shin (shin up, toes up). Picking a part rolls it into that position, the way she'd roll over; it can't be turned by hand.
   - **A palm landing on the leg:** a click on the stand-in leg. Two clicks = two palms. On glasses this becomes a palm laid flat on the leg.
   - **Direction check:** the mouse stands in for the hand. Pinch the start of the arrow and drag along it; following the arrow's direction turns it green. On glasses this would become real hand tracking.
 
 ## Where things live
-- Where the user is looking during the main task: down at the leg on the bed from above, about 50-60 cm away.
-- Leg: lying face down on the bed in front of the user (left-right in front of them), knee on one side, foot on the other (default: knee left, foot right), calf facing up. Placed where the user is looking when the Lens opens, about 55 cm along their gaze (default). Real adult size: knee to heel about 45 cm, foot about 25 cm long (default), with a foot that reads as a real foot (heel, arch, toes), not a flat paddle. Resting on a simple low cushion that stands in for the bed (default). The user can turn it by dragging.
+- Where the user is looking during the main task: down at the leg on the bed from above (about 55° down, like kneeling beside the bed), about 60-70 cm away.
+- Leg: lying on the bed in front of the user (left-right in front of them), knee on one side, foot on the other (default: knee left, foot right); face down at open. Placed where the user is looking when the Lens opens, about 65 cm along their gaze (default). Real adult size: knee to heel about 45 cm, foot about 25 cm long (default), with a foot that reads as a real foot (heel, arch, toes), not a flat paddle. Resting on a simple low cushion that stands in for the bed (default). Only picking a part changes its position.
 - The whole leg is bigger than the SPECS view at this distance (about 23 x 38 cm at 55 cm). That's fine: what must fit in view is the hint and the active stroke (arrow, ghost hands, label), which sits where the user is looking. When the Lens opens, the middle of the leg and the hint are in view. (default)
 - Palm spots: a small soft dot where each palm landed, about 2 cm across (default).
-- Part labels: three short text choices, "Calf · Shin · Sole", in a small row floating about 8 cm above the second palm spot, facing the user (default). Big enough to pinch easily.
+- Part labels: three short text choices, "Calf · Shin · Sole", in a small row floating about 8 cm above the middle of the leg, facing the user (default). Big enough to pinch easily.
 - Arrow: drawn along the leg's surface from the first palm spot to the second, about 3 cm wide (default).
 - Ghost hands: semi-transparent light hands, life-size, in the chosen part's hand position, moving along the arrow.
 - Technique label: short floating text about 8 cm above the middle of the arrow (default), facing the user, e.g. "Calf knead · medium".
 - Hint: small text about 10 cm above the middle of the leg (default), clear of the foot. Text changes with the step (see below).
 
 ## Hands and input
-- **Turn the stand-in leg:** click-and-drag on the leg (anywhere except the arrow's start). It stays where you let go.
-- **Place the stroke:** click a spot on the leg (first palm, stroke start), then a second spot (second palm, stroke end). A dot marks each.
-- **Pick the part:** after the second spot, "Calf · Shin · Sole" appear. Pinch one. The labels clear and that part's guide starts between the two spots.
-- **Switch or turn off:** pinch the technique label. The choices open again with "Off" added: "Calf · Shin · Sole · Off". Picking a part asks for two new palm spots (a different part is in a different place), then starts that guide. Picking "Off" fades the guide and spots, leaving the plain leg and the start hint. (default for where to pinch: the technique label)
+- **Pick the part:** at open, "Calf · Shin · Sole" float over the leg. Pinch one. The labels clear and the leg settles into that part's position (rolls over if needed).
+- **Place the stroke:** click a spot on the leg (first palm, stroke start), then a second spot (second palm, stroke end). A dot marks each. The second spot starts that part's guide between the two spots.
+- **Switch or turn off:** pinch the technique label. The choices open again with "Off" added: "Calf · Shin · Sole · Off". Picking a part sets the leg's position and asks for two new palm spots (a different part is in a different place), then starts that guide. Picking "Off" fades the guide and spots, back to the opening choices. (default for where to pinch: the technique label)
 - **Direction check:** pinch and drag starting on the arrow's start, along the arrow. Dragging in the arrow's direction turns it green; the wrong way or off the path leaves it neutral. Releasing resets it.
-- A short click (little movement) on the leg = a palm spot; a click that moves = turning the leg; a drag from the arrow's start = direction check. (default)
+- A click on the leg = a palm spot; a drag from the arrow's start = direction check. (default)
 - Targets are big and highlight when aimed at.
 - Voice: none.
 
@@ -52,9 +51,9 @@ Intensity is shown as the label word, and by the ghost hands moving slower and d
 
 ## When things show
 - Stand-in leg: always.
-- Hint: "Place your palm where the stroke starts" at start and after "Off"; "Now where it ends" after the first spot; "Pick the part" while the choices are open; hidden while a guide plays.
+- Hint: "Pick the part" while the choices are open (at start and after "Off"); "Place your palm where the stroke starts" after a part is picked; "Now where it ends" after the first spot; hidden while a guide plays.
 - Palm spots: from when they're placed until a part's guide is turned off or replaced.
-- Part choices: only after the second spot, or after pinching the technique label. Clear once one is picked.
+- Part choices: at start, after "Off", or after pinching the technique label. Clear once one is picked.
 - Arrow, ghost hands, technique label: only while a part is chosen; loop until the user switches or turns it off. No timers, no nudges.
 - Green arrow: only while a drag is following the arrow's direction.
 - If something needs attention out of view: none (everything is on the leg in front of the user).
@@ -66,7 +65,7 @@ Feedback is subtle (default), because content sits about 50 cm from the eyes. So
 - **Guide appears / switches:** fades in over 300 ms; the old guide fades out over 300 ms, no hard cut. (default)
 - **Off:** guide and spots fade out over 300 ms, soft lower-pitched click. (default)
 - **Hint:** crossfades between texts over 300 ms. (default)
-- **Turning the leg:** follows the drag smoothly; no sound. (default)
+- **Leg changing position:** rolls smoothly over about 0.7 s (ease in/out); clicks wait until it settles; no sound. (default)
 - **Ghost hand loop:** one stroke ≈ 3 s along the arrow with ease-in/ease-out, 0.5 s pause at the end, then the hands fade back to the start and repeat. "Gentle" ≈ 3.5 s and hands hover just above the surface; "firm" ≈ 2.5 s with hands slightly sunk into the surface. (default)
 - **Arrows:** a light shimmer travels along the arrow in the stroke direction, in time with the ghost hands. (default)
 - **Drag-to-trace:** arrow turns green once the drag has moved ≥ 4 cm in the arrow's direction (within ~30° of it), with a soft chime the first time it goes green in each drag. Wrong direction or off-path: arrow stays neutral, no sound. On release, it fades back to neutral over 300 ms.
@@ -76,11 +75,11 @@ Feedback is subtle (default), because content sits about 50 cm from the eyes. So
 
 ## Done criteria
 Each one can be checked in Lens Studio's preview.
-1. When the Lens opens, a life-size leg with a real-looking foot lies face down on the bed about 50-60 cm away, where the user is looking, with the hint "Place your palm where the stroke starts" above it, clear of the foot.
-2. Click-and-dragging the leg turns it to show another side, and it stays where it's released.
-3. Clicking a spot on the leg, then a second spot, puts a dot on each, and "Calf · Shin · Sole" appear above the second spot.
-4. Pinching "Calf" clears the choices and shows an arrow from the first spot to the second, ghost hands looping the stroke along it, and the label "Calf knead · medium".
-5. Pinching the technique label reopens the choices with "Off". Picking "Shin" asks for two new spots and then shows the shin guide with "Shin glide · gentle"; picking "Off" clears the guide and spots, leaving the leg and the start hint.
+1. When the Lens opens, a life-size leg with a real-looking foot lies face down on the bed about 60-70 cm away, below the user's eyes where they are looking, with "Calf · Shin · Sole" and the hint "Pick the part" above it, clear of the foot.
+2. Picking a part settles the leg in that part's position: "Shin" rolls it face up, "Calf" or "Sole" face down. Dragging on the leg doesn't turn it.
+3. After picking a part, the hint asks for the first palm; clicking a spot on the leg, then a second spot, puts a dot on each.
+4. With "Calf" picked, the second spot shows an arrow from the first spot to the second, ghost hands looping the stroke along it, and the label "Calf knead · medium".
+5. Pinching the technique label reopens the choices with "Off". Picking "Shin" rolls the leg face up and asks for two new spots, then shows the shin guide with "Shin glide · gentle"; picking "Off" clears the guide and spots, back to "Calf · Shin · Sole" and "Pick the part".
 6. With a guide showing, pinching the start of its arrow and dragging along it in the right direction turns the arrow green; dragging the wrong way leaves it neutral.
 
 ## Out of scope
@@ -94,8 +93,7 @@ Each one can be checked in Lens Studio's preview.
 - Palm placement on real glasses (detecting a palm laid flat on someone's leg) is a hand-pose gesture the preview can't show; clicks stand in for it. Feel unproven.
 - Direction check is a mouse-drag stand-in. On real glasses it would need hand tracking while hands are pressed on a leg, where tracking may drop out. Feel unproven.
 - Once placed, the guide stays put in the room. If she moves her leg, the user re-places it. On glasses this is honest (no leg tracking); it may feel fussy if she moves a lot.
-- Click vs. drag on the stand-in leg (palm spot vs. turning) relies on a small movement threshold; a shaky click could turn the leg instead.
-- The preview camera starts looking straight ahead; for the view from above, look down (right-drag in Interactive Preview) before the Lens starts, so the leg is placed under your gaze.
+- The leg is placed under the user's gaze when the Lens starts. For the view from above, the Interactive Preview camera is set to look about 55° down before the Lens starts (it keeps that pose across refreshes); with a level camera the leg sits much higher than a bed.
 - Keep the content clinical and fitness-framed (plain grey leg, physio-style labels) so it can't read as anything else.
 - Strokes are generic defaults, not expert-reviewed massage instruction.
 

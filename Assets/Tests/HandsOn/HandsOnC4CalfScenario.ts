@@ -1,10 +1,10 @@
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {findSceneObjectByName, sleep} from "Leaf.lspkg/Utils/common/Utils"
-import {HandsOnLeafInteractor, getMain, log, resetToStart, v, visibleSpot, waitFrames, waitUntil} from "./HandsOnTestKit"
+import {HandsOnLeafInteractor, getMain, log, placePartGuide, resetToStart, v, waitFrames, waitUntil} from "./HandsOnTestKit"
 
 /**
- * Criterion 4 — pinching "Calf" (real SIK trigger) clears the choices and shows the arrow
+ * Criterion 4 — with "Calf" picked (real SIK pinch), the second real SIK tap shows the arrow
  * from spot 1 to spot 2, the ghost hands looping along it, and "Calf knead · medium".
  */
 @component
@@ -14,13 +14,9 @@ export class HandsOnC4CalfScenario extends Scenario {
     const main = getMain()
     const ix = new HandsOnLeafInteractor()
     await resetToStart(main, ix)
-    await ix.tapLeg(visibleSpot(main, "calf", 0))
-    await ix.tapLeg(visibleSpot(main, "calf", 1))
-    expect(main.areChoicesVisible(), "choices before pick").toBe(true)
+    await placePartGuide(main, ix, "calf", "Calf")
     const spots = main.getSpotPositions()
-
-    await ix.pinch("Choice_Calf")
-    expect(main.areChoicesVisible(), "choices after pick").toBe(false)
+    expect(main.areChoicesVisible(), "no choices with the guide").toBe(false)
     const shown = await waitUntil(() => main.isGuideVisible(), 90)
     expect(shown, "guide visible within 90 frames").toBe(true)
     expect(main.getStep()).toBe("guide")

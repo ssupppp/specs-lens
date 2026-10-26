@@ -4,19 +4,20 @@
  *
  * Owns: building the plain grey leg + foot mesh on this SceneObject ("Leg") in a natural
  * pose, the low cushion mesh on the authored Cushion object, a mesh collider + SIK
- * Interactable on the leg, and telling a short click (= a palm spot) from a moving
- * click (= turn the leg; it stays where released).
- * Public API: shape (LegShape), onTap (Event<LegTap>), getTurnDeg(), getLegRotation(),
- *   surfaceToWorld(), worldToLocal().
- * Expects: legMaterial, cushionMaterial, cushion (authored SceneObject, sibling of Leg).
+ * Interactable on the leg (a click = a palm spot), and the leg's two fixed positions on
+ * the bed: face down (as authored) and face up, rolled between over ROLL_SECONDS.
+ * Public API: shape (LegShape), onTap (Event<LegTap>), setPose(), getPose(), isRolling(),
+ *   getLegRotation(), surfaceToWorld(), worldToLocal().
+ * Expects: legMaterial, cushionMaterial, cushion (authored SceneObject, sibling of Leg);
+ *   the Leg's authored rotation is the face-down position.
  * Must not: own guide/step state (HandsOnMain does) or show text.
  */
 import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable"
 import {Interactor} from "SpectaclesInteractionKit.lspkg/Core/Interactor/Interactor"
 import {InteractorEvent} from "SpectaclesInteractionKit.lspkg/Core/Interactor/InteractorEvent"
-import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/CameraProvider/WorldCameraFinderProvider"
 import Event, {PublicApi} from "SpectaclesInteractionKit.lspkg/Utils/Event"
 import {LegShape, Region, SurfaceSample, V3, buildCushionMesh, buildLegMesh, fromVec3, toVec3} from "./HandsOnLegGeometry"
+import {LegPose} from "./HandsOnParts"
 
 /** A palm spot placed by a short click on the leg (world space). */
 export interface LegTap {
@@ -24,7 +25,8 @@ export interface LegTap {
   normal: vec3
 }
 
-const DEG = Math.PI / 180
+/** How long the leg takes to roll between face down and face up. */
+const ROLL_SECONDS = 0.7
 
 @component
 export class HandsOnLegModel extends BaseScriptComponent {
@@ -64,16 +66,6 @@ export class HandsOnLegModel extends BaseScriptComponent {
   footPlantarflexDeg: number = 25
 
   @input
-  @hint("A click that moves less than this (cm) places a palm spot; more turns the leg")
-  @widget(new SliderWidget(0.3, 4, 0.1))
-  tapMoveCm: number = 1.2
-
-  @input
-  @hint("How far the leg turns per cm of drag, degrees")
-  @widget(new SliderWidget(1, 12, 0.5))
-  turnDegPerCm: number = 5
-
-  @input
   @hint("Cushion size W/H/D in cm")
   cushionSizeCm: vec3 = new vec3(62, 7, 26)
   @ui.group_end
@@ -89,13 +81,14 @@ export class HandsOnLegModel extends BaseScriptComponent {
   private active: Interactor | null = null
   private hitPos: vec3 = vec3.zero()
   private hitNormal: vec3 = vec3.up()
-  private planeOrigin: vec3 = vec3.zero()
-  private planeNormal: vec3 = vec3.forward()
-  private startPoint: vec3 = vec3.zero()
-  private prevPoint: vec3 = vec3.zero()
-  private turning = false
-  private yawDeg = 0
-  private rollDeg = 0
+
+  // position on the bed (local rotations of this object)
+  private pose: LegPose = "faceDown"
+  private faceDownRot: quat = quat.quatIdentity()
+  private faceUpRot: quat = quat.quatIdentity()
+  private rollFrom: quat = quat.quatIdentity()
+  private rollTo: quat = quat.quatIdentity()
+  private rollT = 1
 
   /** Parametric leg surface (Leg-local cm). Built lazily so other scripts can call it from their onAwake. */
   get shape(): LegShape {
@@ -117,17 +110,27 @@ export class HandsOnLegModel extends BaseScriptComponent {
     return this.tapEvent.publicApi()
   }
 
-  /** Accumulated turn from dragging: x = yaw (around up), y = roll (around the leg). Degrees. */
-  getTurnDeg(): vec2 {
-    return new vec2(this.yawDeg, this.rollDeg)
+  /** Roll the leg to lie face down or face up (instantly when `animate` is false). */
+  setPose(pose: LegPose, animate: boolean = true): void {
+    if (pose === this.pose && this.rollT >= 1) return
+    this.pose = pose
+    this.rollFrom = this.sceneObject.getTransform().getLocalRotation()
+    this.rollTo = pose === "faceUp" ? this.faceUpRot : this.faceDownRot
+    this.rollT = animate ? 0 : 1
+    if (!animate) this.applyRoll()
+  }
+
+  /** The position the leg is in, or rolling toward. */
+  getPose(): LegPose {
+    return this.pose
+  }
+
+  isRolling(): boolean {
+    return this.rollT < 1
   }
 
   getLegRotation(): quat {
     return this.sceneObject.getTransform().getWorldRotation()
-  }
-
-  isTurning(): boolean {
-    return this.turning
   }
 
   /** World position + normal of a surface coordinate on the leg as it is now. */
@@ -147,6 +150,10 @@ export class HandsOnLegModel extends BaseScriptComponent {
   }
 
   onAwake(): void {
+    // authored rotation = face down; face up = rolled half a turn around the leg's long axis (+X)
+    this.faceDownRot = this.sceneObject.getTransform().getLocalRotation()
+    this.faceUpRot = this.faceDownRot.multiply(quat.angleAxis(Math.PI, vec3.right()))
+
     const legRmv = this.sceneObject.createComponent("Component.RenderMeshVisual") as RenderMeshVisual
     const legMesh = buildLegMesh(this.shape).getMesh()
     legRmv.mesh = legMesh
@@ -170,12 +177,14 @@ export class HandsOnLegModel extends BaseScriptComponent {
       interactable.onHoverEnter.add(() => (this.hoverTarget = 1))
       interactable.onHoverExit.add(() => (this.hoverTarget = 0))
       interactable.onTriggerStart.add((e) => this.beginPress(e))
-      interactable.onTriggerUpdate.add((e) => this.updatePress(e))
       interactable.onTriggerEnd.add((e) => this.endPress(e, true))
       interactable.onTriggerEndOutside.add((e) => this.endPress(e, true))
       interactable.onTriggerCanceled.add((e) => this.endPress(e, false))
     })
-    this.createEvent("UpdateEvent").bind(() => this.updateHover())
+    this.createEvent("UpdateEvent").bind(() => {
+      this.updateHover()
+      this.updateRoll()
+    })
 
     if (this.cushion) {
       const s = this.cushionSizeCm
@@ -188,13 +197,12 @@ export class HandsOnLegModel extends BaseScriptComponent {
     }
   }
 
-  // ── click vs turn ──
+  // ── click = palm spot ──
 
   private beginPress(e: InteractorEvent): void {
     if (this.active) return
     const it = e.interactor
     this.active = it
-    this.turning = false
     const hit = it.targetHitInfo?.hit ?? null
     if (hit) {
       this.hitPos = hit.position
@@ -207,63 +215,28 @@ export class HandsOnLegModel extends BaseScriptComponent {
       this.hitPos = m.multiplyPoint(toVec3(s.p))
       this.hitNormal = m.multiplyDirection(toVec3(s.n)).normalize()
     }
-    const cam = WorldCameraFinderProvider.getInstance().getTransform()
-    this.planeOrigin = this.hitPos
-    this.planeNormal = cam.getWorldPosition().sub(this.hitPos).normalize()
-    const p = this.pointerOnPlane(it)
-    this.startPoint = p ?? this.hitPos
-    this.prevPoint = this.startPoint
-  }
-
-  private updatePress(e: InteractorEvent): void {
-    if (e.interactor !== this.active) return
-    const p = this.pointerOnPlane(e.interactor)
-    if (!p) return
-    if (!this.turning && p.distance(this.startPoint) > this.tapMoveCm) {
-      this.turning = true
-      this.prevPoint = this.startPoint
-    }
-    if (this.turning) {
-      this.turnBy(p.sub(this.prevPoint))
-      this.prevPoint = p
-    }
   }
 
   private endPress(e: InteractorEvent, completed: boolean): void {
     if (e.interactor !== this.active) return
-    const wasTurning = this.turning
     this.active = null
-    this.turning = false
-    if (completed && !wasTurning) this.tapEvent.invoke({position: this.hitPos, normal: this.hitNormal})
+    // the spot is where the press landed; clicks while rolling are ignored
+    if (completed && !this.isRolling()) this.tapEvent.invoke({position: this.hitPos, normal: this.hitNormal})
   }
 
-  /** Where the interactor's ray crosses the camera-facing plane through the pressed point. */
-  private pointerOnPlane(it: Interactor): vec3 | null {
-    const origin = it.startPoint
-    const dir = it.direction
-    if (!origin || !dir) return null
-    const denom = dir.dot(this.planeNormal)
-    if (Math.abs(denom) < 1e-4) return null
-    const t = this.planeOrigin.sub(origin).dot(this.planeNormal) / denom
-    return origin.add(dir.uniformScale(t))
+  // ── rolling between positions ──
+
+  private updateRoll(): void {
+    if (this.rollT >= 1) return
+    this.rollT = Math.min(1, this.rollT + getDeltaTime() / ROLL_SECONDS)
+    this.applyRoll()
   }
 
-  /** Turn the leg so the side under the pointer follows the drag: sideways = yaw, up/down = roll. */
-  private turnBy(delta: vec3): void {
-    const cam = WorldCameraFinderProvider.getInstance().getTransform()
-    const dx = delta.dot(cam.right)
-    const dy = delta.dot(cam.up)
-    const t = this.sceneObject.getTransform()
-    const rot = t.getWorldRotation()
-    let axis = rot.multiplyVec3(vec3.right()).normalize()
-    if (axis.dot(cam.right) < 0) axis = axis.uniformScale(-1)
-    const yawDeg = dx * this.turnDegPerCm
-    const rollDeg = -dy * this.turnDegPerCm
-    const yaw = quat.angleAxis(yawDeg * DEG, vec3.up())
-    const roll = quat.angleAxis(rollDeg * DEG, axis)
-    t.setWorldRotation(yaw.multiply(roll.multiply(rot)))
-    this.yawDeg += yawDeg
-    this.rollDeg += rollDeg
+  private applyRoll(): void {
+    const t = this.rollT
+    const eased = t * t * (3 - 2 * t)
+    this.sceneObject.getTransform().setLocalRotation(quat.slerp(this.rollFrom, this.rollTo, eased))
+    if (this.cushion) this.fitCushionUnderLeg()
   }
 
   // ── hover highlight + cushion ──

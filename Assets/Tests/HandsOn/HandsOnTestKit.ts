@@ -4,7 +4,7 @@
  * - HandsOnLeafInteractor: a DefaultLeafInteractor that can aim its ray at a chosen world
  *   point (so a real SIK trigger lands on a specific spot of the leg) and records the hit.
  * - getMain(), frame waits, pinch-by-name, and resetToStart() which drives the Lens back to
- *   the "Place your palm where the stroke starts" state through real pinches.
+ *   the opening "Pick the part" state through real pinches.
  */
 import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable"
 import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/CameraProvider/WorldCameraFinderProvider"
@@ -14,7 +14,8 @@ import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {findSceneObjectByName, nextFrame, sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HandsOnMain} from "../../Scripts/HandsOnMain"
 
-export const START_HINT = "Place your palm where the stroke starts"
+export const START_HINT = "Pick the part"
+export const PALM_HINT = "Place your palm where the stroke starts"
 
 export function getMain(): HandsOnMain {
   const so = findSceneObjectByName("HandsOn")
@@ -111,6 +112,14 @@ export class HandsOnLeafInteractor extends DefaultLeafInteractor {
     await this.trigger(it)
     await sleep(400) // debounce + label fade-in gate
   }
+
+  /** Pinch a part's chip and wait for the leg to settle into that part's position. */
+  async pickPart(main: HandsOnMain, partName: string): Promise<void> {
+    await this.pinch("Choice_" + partName)
+    const settled = await waitUntil(() => !main.isLegRolling(), 120)
+    if (!settled) throw new Error("Leg still rolling after picking " + partName)
+    await waitFrames(2)
+  }
 }
 
 /** A point on the leg's camera-facing side near the part's suggested spot. */
@@ -118,34 +127,52 @@ export function visibleSpot(main: HandsOnMain, partId: string, index: number): v
   return main.getSuggestedSpotWorld(partId, index)
 }
 
-/** Drive the Lens back to placeStart (no guide, no spots, no pending part) with real input. */
+/** The opening state: choices without "Off", no guide, no spots, no part waiting. */
+export function atStart(main: HandsOnMain): boolean {
+  return (
+    main.getStep() === "pickPart" &&
+    main.getChoiceOptions().indexOf("Off") < 0 &&
+    main.getSpotCount() === 0 &&
+    main.getPendingPartId() === "" &&
+    !main.isGuideVisible()
+  )
+}
+
+/** Drive the Lens back to the opening "Pick the part" state with real input. */
 export async function resetToStart(main: HandsOnMain, ix: HandsOnLeafInteractor): Promise<void> {
   for (let i = 0; i < 8; i++) {
+    if (atStart(main)) break
     const step = main.getStep()
-    if (step === "placeStart" && main.getPendingPartId() === "" && main.getSpotCount() === 0) break
-    if (step === "placeStart" || step === "placeEnd") {
-      await ix.tapLeg(visibleSpot(main, "calf", main.getSpotCount() === 0 ? 0 : 1))
+    const pending = main.getPendingPartId()
+    if ((step === "placeStart" || step === "placeEnd") && pending !== "") {
+      await waitUntil(() => !main.isLegRolling(), 120)
+      await ix.tapLeg(visibleSpot(main, pending, main.getSpotCount() === 0 ? 0 : 1))
     } else if (step === "pickPart") {
-      const opts = main.getChoiceOptions()
-      await ix.pinch(opts.indexOf("Off") >= 0 ? "Choice_Off" : "Choice_Calf")
+      await ix.pinch("Choice_Off")
     } else if (step === "guide") {
       await ix.pinch("TechniqueLabelButton")
     }
     await waitFrames(5)
   }
-  if (main.getStep() !== "placeStart" || main.getSpotCount() !== 0 || main.getPendingPartId() !== "") {
+  if (!atStart(main)) {
     throw new Error("resetToStart failed: step=" + main.getStep() + " spots=" + main.getSpotCount())
   }
   await sleep(500) // let fades finish
 }
 
-/** Place two spots and pick Calf so a Calf guide is showing. */
+/** Pick `partName`, then place two palm spots on its suggested points; returns the hit points. */
+export async function placePartGuide(main: HandsOnMain, ix: HandsOnLeafInteractor, partId: string, partName: string): Promise<vec3[]> {
+  await ix.pickPart(main, partName)
+  const hit1 = await ix.tapLeg(visibleSpot(main, partId, 0))
+  const hit2 = await ix.tapLeg(visibleSpot(main, partId, 1))
+  return [hit1, hit2]
+}
+
+/** Pick Calf and place two spots so a Calf guide is showing. */
 export async function ensureCalfGuide(main: HandsOnMain, ix: HandsOnLeafInteractor): Promise<void> {
   if (main.getStep() === "guide" && main.getChosenPartId() === "calf") return
   await resetToStart(main, ix)
-  await ix.tapLeg(visibleSpot(main, "calf", 0))
-  await ix.tapLeg(visibleSpot(main, "calf", 1))
-  await ix.pinch("Choice_Calf")
+  await placePartGuide(main, ix, "calf", "Calf")
   const ok = await waitUntil(() => main.isGuideVisible(), 90)
   if (!ok) throw new Error("Calf guide did not appear")
   await sleep(300)
@@ -160,9 +187,7 @@ export async function showPartGuide(partId: string, partName: string): Promise<v
   const main = getMain()
   const ix = new HandsOnLeafInteractor()
   await resetToStart(main, ix)
-  await ix.tapLeg(visibleSpot(main, partId, 0))
-  await ix.tapLeg(visibleSpot(main, partId, 1))
-  await ix.pinch("Choice_" + partName)
+  await placePartGuide(main, ix, partId, partName)
   const shown = await waitUntil(() => main.isGuideVisible(), 90)
   expect(shown, partName + " guide visible").toBe(true)
   await waitFrames(15) // hands are posed one point along the stroke per frame

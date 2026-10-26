@@ -1,28 +1,27 @@
 import {Scenario} from "Leaf.lspkg/Scenarios/scenario/Scenario"
 import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {findSceneObjectByName, findSceneObjectsByName, sleep} from "Leaf.lspkg/Utils/common/Utils"
-import {HandsOnLeafInteractor, START_HINT, camTransform, getMain, log, resetToStart, v} from "./HandsOnTestKit"
+import {HandsOnLeafInteractor, START_HINT, atStart, camTransform, getMain, log, resetToStart, v} from "./HandsOnTestKit"
 
 /**
- * Criterion 1 — on open: leg ~50 cm in front, slightly below eye level; start hint above it,
- * clear of the foot. Observes state only (run right after a preview refresh for the true
- * "Lens opens" state; otherwise it resets to the start step with real pinches first).
+ * Criterion 1 — on open: leg face down on the bed 60-70 cm away, below the eyes where the user
+ * looks (the preview camera looks ~55 deg down); "Calf · Shin · Sole" and the "Pick the part"
+ * hint above it, clear of the foot. Observes state only (run right after a preview refresh for
+ * the true "Lens opens" state; otherwise it resets to the start with real pinches first).
  */
 @component
 export class HandsOnC1OpenScenario extends Scenario {
   async run(): Promise<void> {
     await sleep(1000)
     const main = getMain()
-    if (main.getStep() !== "placeStart" || main.getSpotCount() !== 0) {
+    if (!atStart(main)) {
       log("C1: Lens not at start state; resetting with real input")
       await resetToStart(main, new HandsOnLeafInteractor())
     }
 
     const cam = camTransform()
     const camPos = cam.getWorldPosition()
-    const look = cam.back
-    const fwd = new vec3(look.x, 0, look.z).normalize()
-    const right = cam.right
+    const look = cam.back.normalize()
 
     const leg = findSceneObjectByName("Leg")
     expect(leg, "Leg object").toBeTruthy()
@@ -31,16 +30,25 @@ export class HandsOnC1OpenScenario extends Scenario {
     const legMax = rmv.worldAabbMax()
     const legCenter = legMin.add(legMax).uniformScale(0.5)
     const rel = legCenter.sub(camPos)
-    const ahead = rel.dot(fwd)
+    const dist = rel.length
+    const offGaze = (Math.acos(Math.max(-1, Math.min(1, rel.normalize().dot(look)))) * 180) / Math.PI
     const below = camPos.y - legCenter.y
-    const lateral = rel.dot(right)
-    log("C1: cam " + v(camPos) + " legCenter " + v(legCenter) + " ahead=" + ahead.toFixed(1) + " below=" + below.toFixed(1) + " lateral=" + lateral.toFixed(1))
+    log("C1: cam " + v(camPos) + " legCenter " + v(legCenter) + " dist=" + dist.toFixed(1) + " offGaze=" + offGaze.toFixed(1) + " below=" + below.toFixed(1))
 
-    expect(ahead, "leg distance in front (cm)").toBeGreaterThan(40)
-    expect(ahead, "leg distance in front (cm)").toBeLessThan(70)
-    expect(below, "leg drop below eye level (cm)").toBeGreaterThan(3)
-    expect(below, "leg drop below eye level (cm)").toBeLessThan(35)
-    expect(Math.abs(lateral), "leg sideways offset (cm)").toBeLessThan(20)
+    expect(dist, "leg distance from the eyes (cm)").toBeGreaterThan(55)
+    expect(dist, "leg distance from the eyes (cm)").toBeLessThan(80)
+    expect(offGaze, "leg angle off the gaze (deg)").toBeLessThan(15)
+    expect(below, "leg below eye level, seen from above (cm)").toBeGreaterThan(35)
+
+    // face down: the back of the calf faces up
+    expect(main.getLegPose()).toBe("faceDown")
+    const calfUp = main.legModel.surfaceToWorld("leg", 20, 180).normal.y
+    log("C1: calf normal y=" + calfUp.toFixed(2))
+    expect(calfUp, "calf faces up").toBeGreaterThan(0.7)
+
+    // part choices up front
+    expect(main.areChoicesVisible(), "choices at open").toBe(true)
+    expect(main.getChoiceOptions().join(" · ")).toBe("Calf · Shin · Sole")
 
     // hint text + where it sits
     expect(main.getHintText()).toBe(START_HINT)
