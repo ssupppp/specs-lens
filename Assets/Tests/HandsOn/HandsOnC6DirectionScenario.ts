@@ -21,7 +21,7 @@ export class HandsOnC6DirectionScenario extends Scenario {
     log("C6: arrow direction " + v(dir) + " start " + v(main.getArrowStart()) + " end " + v(main.getArrowEnd()))
     expect(main.isArrowGreen(), "neutral before drag").toBe(false)
 
-    const right = await this.dragAndWatch(main, ix, handleName, dir.uniformScale(0.6), 700)
+    const right = await this.dragAndWatch(main, ix, handleName, dir.uniformScale(0.6), 1100)
     log("C6: along-arrow drag — saw green " + right.green + ", handle moved " + right.moved.toFixed(1) + " cm")
     expect(right.moved, "handle moved by the drag (cm)").toBeGreaterThan(4)
     expect(right.green, "arrow turned green on the right-way drag").toBe(true)
@@ -29,7 +29,7 @@ export class HandsOnC6DirectionScenario extends Scenario {
     await sleep(600) // release fades back to neutral
     expect(main.isArrowGreen(), "neutral after release").toBe(false)
 
-    const wrong = await this.dragAndWatch(main, ix, handleName, dir.uniformScale(-0.6), 700)
+    const wrong = await this.dragAndWatch(main, ix, handleName, dir.uniformScale(-0.6), 1100)
     log("C6: wrong-way drag — saw green " + wrong.green + ", handle moved " + wrong.moved.toFixed(1) + " cm")
     expect(wrong.moved, "handle moved by the wrong-way drag (cm)").toBeGreaterThan(4)
     expect(wrong.green, "arrow stayed neutral on the wrong-way drag").toBe(false)

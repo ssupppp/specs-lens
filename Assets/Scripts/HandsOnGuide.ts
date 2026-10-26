@@ -2,8 +2,12 @@
  * HandsOnGuide — one placed massage guide, built at runtime between two palm spots.
  *
  * Owns (view + input for one guide): the stroke arrow along the leg surface with its
- * travelling shimmer, two looping ghost hands, and the arrow-start handle
- * (ArrowStart_<Name>) used for the drag-to-trace direction check.
+ * travelling shimmer, two looping ghost hands (GhostHand_<Name>_L/R, SIK's rigged hands posed
+ * onto the skin by HandsOnHandPoser), and the arrow-start handle (ArrowStart_<Name>) used for
+ * the drag-to-trace direction check.
+ * The hands are posed at a few points along the stroke (one per frame after placing, so
+ * placing doesn't stall) and blended between them as they loop, so the grip follows the
+ * leg as it narrows toward the ankle.
  * World-locked: its root copies the leg's pose at the moment it was placed and is NOT a
  * child of the leg, so turning the stand-in leg afterwards does not move the guide.
  * Talks to HandsOnMain through callbacks only (onDirectionMatched).
@@ -12,13 +16,19 @@
 import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable"
 import {InteractableManipulation} from "SpectaclesInteractionKit.lspkg/Components/Interaction/InteractableManipulation/InteractableManipulation"
 import {INTENSITY_PROFILE, PartDef} from "./HandsOnParts"
-import {ArrowMesh, StrokePath, buildArrowMesh, buildDiscMesh, buildHandMesh, toVec3} from "./HandsOnLegGeometry"
+import {HandSpec, HandsOnHandPoser, Side, allTransforms, ghostHandMaterial, useFullMesh} from "./HandsOnHandPoser"
+import {ArrowMesh, StrokePath, SurfaceSample, V3, add, buildArrowMesh, buildDiscMesh, dot, scale, sub, toVec3} from "./HandsOnLegGeometry"
 
 export interface GuideLook {
   guideMaterial: Material
+  /** Lit material for the ghost hands (cloned, tinted and made see-through). */
+  handMaterial: Material
+  rightHandPrefab: ObjectPrefab
+  leftHandPrefab: ObjectPrefab
   arrowColor: vec3
   handColor: vec3
   checkColor: vec3
+  /** Ghost hand opacity, 0-1. */
   ghostHandStrength: number
   dragMinCm: number
   dragMaxAngleDeg: number
@@ -27,7 +37,14 @@ export interface GuideLook {
 const FADE_SECONDS = 0.3
 const STROKE_PAUSE = 0.5
 const HAND_FADE = 0.25
-const PALM_HALF_THICKNESS = 1.2
+const DEG = Math.PI / 180
+/** Points along the stroke where the hands are posed; they blend between these while looping. */
+const POSE_KEYS = 6
+/** Fingers set within this angle of the stroke point that way; beyond it they wrap the limb. */
+const WRAP_YAW_DEG = 45
+/** Thumbs on the arrow rest this far ahead of the palm, either side of the line. */
+const THUMB_LEAD_CM = 1.5
+const THUMB_ACROSS_CM = 0.9
 const ARROW_WIDTH_CM = 3
 const ARROW_LIFT_CM = 0.45
 
@@ -53,8 +70,16 @@ export class HandsOnGuide {
 
   private readonly arrowMat: Material
   private readonly dotMat: Material
-  private readonly handMats: Material[] = []
+  private readonly handMat: Material
   private readonly hands: SceneObject[] = []
+  private readonly poser: HandsOnHandPoser
+  private readonly sides: Side[]
+  /** Per hand: fingers point back along the stroke, because the set way would bend the hand toward the user. */
+  private readonly flipFingers: boolean[] = []
+  /** Per hand: every transform in the rig (index 0 = the hand itself) and its rest pose. */
+  private readonly rigs: {joints: Transform[]; restPos: vec3; restRot: quat[]}[] = []
+  /** Per hand, per pose key: the hand's position and every joint's rotation (local). */
+  private readonly keys: {pos: vec3; rot: quat[]}[][] = []
   private readonly arrow: ArrowMesh
   private readonly handleRestLocal: vec3
   private readonly strokeDirLocal: vec3
@@ -79,16 +104,21 @@ export class HandsOnGuide {
     this.arrowMat = look.guideMaterial.clone()
     this.addVisual(arrowObj, this.arrow.builder.getMesh(), this.arrowMat)
 
-    // ── ghost hands ──
-    for (const pose of part.hands) {
-      const hand = this.makeObject(this.root, "GhostHand_" + part.name + "_" + (pose.side === "left" ? "L" : "R"))
-      const mat = look.guideMaterial.clone()
-      // closed solids: cull back faces and write depth so overlapping layers don't stack into solid white
-      mat.mainPass.twoSided = false
-      mat.mainPass.depthWrite = true
-      this.addVisual(hand, buildHandMesh(pose.side === "left", pose.curlDeg).getMesh(), mat)
+    // ── ghost hands: the one further to the user's right is the right hand ──
+    this.poser = new HandsOnHandPoser(path.shape, rt, camera)
+    this.handMat = ghostHandMaterial(look.handMaterial, look.handColor, 0)
+    const mid = this.handSpecs(0.5)
+    this.sides = this.poser.sides(mid)
+    // decided once for the whole stroke, so a hand never spins round partway along it
+    this.flipFingers = mid.map((h, i) => !!h.fingers && !this.poser.canPointFingers(h, this.sides[i]))
+    for (const side of this.sides) {
+      const hand = (side === "R" ? look.rightHandPrefab : look.leftHandPrefab).instantiate(this.root)
+      hand.name = "GhostHand_" + part.name + "_" + side
+      useFullMesh(hand, this.handMat)
+      const joints = allTransforms(hand)
+      this.rigs.push({joints, restPos: joints[0].getLocalPosition(), restRot: joints.map((t) => t.getLocalRotation())})
       this.hands.push(hand)
-      this.handMats.push(mat)
+      this.keys.push([])
     }
 
     // ── arrow-start handle: drag along the arrow to check direction ──
@@ -174,6 +204,7 @@ export class HandsOnGuide {
       this.root.destroy()
       return
     }
+    if (this.keys[0].length < POSE_KEYS) this.poseNextKey()
     this.time += dt
     this.updateDrag(dt)
     this.updateStroke()
@@ -202,23 +233,23 @@ export class HandsOnGuide {
       handFade = (t - D - STROKE_PAUSE - HAND_FADE) / HAND_FADE
     }
 
-    // ghost hands ride the stroke
-    const lift = prof.liftCm + PALM_HALF_THICKNESS
-    for (let i = 0; i < this.hands.length; i++) {
-      const pose = this.part.hands[i]
-      const s = Math.max(0, Math.min(1, prog + pose.along / this.path.length))
-      const o = this.path.offset(s, pose.across, lift)
-      const yaw = (pose.fingerYawDeg * Math.PI) / 180
-      const T = toVec3(o.t)
-      const R = toVec3(o.right)
-      const fingers = T.uniformScale(Math.cos(yaw)).add(R.uniformScale(Math.sin(yaw))).normalize()
-      const ht = this.hands[i].getTransform()
-      ht.setLocalPosition(toVec3(o.p))
-      ht.setLocalRotation(this.basisRotation(fingers, toVec3(o.n)))
-      const k = this.look.ghostHandStrength * this.alpha * handFade
-      const c = this.look.handColor
-      this.handMats[i].mainPass.baseColor = new vec4(c.x * k, c.y * k, c.z * k, 1)
+    // ghost hands ride the stroke, blending between the poses along it (hidden until all are posed)
+    const ready = this.keys[0].length >= POSE_KEYS
+    if (ready) {
+      const f = prog * (POSE_KEYS - 1)
+      const k0 = Math.min(POSE_KEYS - 2, Math.floor(f))
+      const w = f - k0
+      for (let i = 0; i < this.hands.length; i++) {
+        const a = this.keys[i][k0]
+        const b = this.keys[i][k0 + 1]
+        const joints = this.rigs[i].joints
+        joints[0].setLocalPosition(vec3.lerp(a.pos, b.pos, w))
+        for (let j = 0; j < joints.length; j++) joints[j].setLocalRotation(quat.slerp(a.rot[j], b.rot[j], w))
+      }
     }
+    const hk = ready ? this.alpha * handFade : 0
+    const c = this.look.handColor
+    this.handMat.mainPass.baseColor = new vec4(c.x * hk, c.y * hk, c.z * hk, this.look.ghostHandStrength * hk)
 
     // arrow colour: neutral pale blue <-> green, with a shimmer travelling with the hands
     const n = this.look.arrowColor
@@ -238,6 +269,54 @@ export class HandsOnGuide {
     this.arrowMat.mainPass.baseColor = new vec4(1, 1, 1, 1)
     const dk = this.alpha * (0.75 + 0.25 * gm)
     this.dotMat.mainPass.baseColor = new vec4(base[0] * dk, base[1] * dk, base[2] * dk, 1)
+  }
+
+  /** Both hands' grip with the stroke at `prog` (0 = arrow start, 1 = end), Leg-local. */
+  private handSpecs(prog: number): HandSpec[] {
+    const len = this.path.length
+    return this.part.hands.map((pose, i) => {
+      const s = Math.max(0, Math.min(1, prog + pose.along / len))
+      const o = this.path.offset(s, 0, 0)
+      const yaw = (pose.fingerYawDeg + (this.flipFingers[i] ? 180 : 0)) * DEG
+      const thumbS = Math.max(0, Math.min(1, s + THUMB_LEAD_CM / len))
+      return {
+        palm: this.aroundArrow(o, pose.aroundDeg),
+        fingers: Math.abs(pose.fingerYawDeg) > WRAP_YAW_DEG ? undefined : add(scale(o.t, Math.cos(yaw)), scale(o.right, Math.sin(yaw))),
+        fingersFixed: true,
+        thumbTarget: pose.thumbOnArrow ? this.path.offset(thumbS, Math.sign(pose.aroundDeg) * THUMB_ACROSS_CM, 0).p : undefined,
+        maxCurlDeg: pose.curlDeg,
+      }
+    })
+  }
+
+  /** The skin `deg` degrees around the limb from the arrow point `o` (+ = right of the arrow). */
+  private aroundArrow(o: {p: V3; right: V3}, deg: number): SurfaceSample {
+    const shape = this.path.shape
+    const at = shape.project(o.p)
+    const s1 = shape.sampleAt(at.region, at.a, at.b + deg)
+    const s2 = shape.sampleAt(at.region, at.a, at.b - deg)
+    const toRight = (q: SurfaceSample) => dot(sub(q.p, o.p), o.right) * Math.sign(deg)
+    return toRight(s1) >= toRight(s2) ? s1 : s2
+  }
+
+  /** Pose both hands for the next point along the stroke and keep the result. */
+  private poseNextKey(): void {
+    const k = this.keys[0].length
+    for (const rig of this.rigs) {
+      rig.joints[0].setLocalPosition(rig.restPos)
+      rig.joints.forEach((t, j) => t.setLocalRotation(rig.restRot[j]))
+    }
+    const specs = this.handSpecs(k / (POSE_KEYS - 1))
+    this.poser.pose(specs, this.hands, this.sides)
+    // gentle hovers just off the skin, firm sinks in a little
+    const lift = INTENSITY_PROFILE[this.part.intensity].liftCm
+    const m = this.root.getTransform().getWorldTransform()
+    for (let i = 0; i < this.hands.length; i++) {
+      const ht = this.hands[i].getTransform()
+      const n = m.multiplyDirection(toVec3(specs[i].palm.n)).normalize()
+      ht.setWorldPosition(ht.getWorldPosition().add(n.uniformScale(lift)))
+      this.keys[i].push({pos: ht.getLocalPosition(), rot: this.rigs[i].joints.map((t) => t.getLocalRotation())})
+    }
   }
 
   // ── direction check (drag the arrow-start dot along the arrow) ──

@@ -60,7 +60,7 @@
     - '// @input AssignableType_1 legModel {"hint":"HandsOnLegModel on the Leg object"}'
     - '// @input Asset.ObjectPrefab rightHandPrefab {"hint":"GhostHandR prefab (SIK right hand model)"}'
     - '// @input Asset.ObjectPrefab leftHandPrefab {"hint":"GhostHandL prefab (SIK left hand model)"}'
-    - '// @input Asset.Material handMaterial {"hint":"Lit material for the ghost hands (cloned, tinted and made additive)"}'
+    - '// @input Asset.Material handMaterial {"hint":"Lit material for the ghost hands (cloned, tinted and made see-through)"}'
     - '// @input SceneObject[] hideWhileOn = {} {"hint":"Objects to switch off while the lab is on (e.g. GuideUI)"}'
     - '// @input Component.ScriptComponent[] pauseWhileOn = {} {"hint":"Script components to pause while the lab is on (e.g. HandsOnMain)"}'
     - '// @input float gripIndex {"hint":"Which grip to show", "widget":"slider", "min":0, "max":5, "step":1}'

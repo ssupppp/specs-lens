@@ -19,15 +19,22 @@
 export type Intensity = "gentle" | "medium" | "firm"
 
 export interface HandPose {
-  side: "left" | "right"
   /** cm offset along the stroke, relative to the moving stroke point. */
   along: number
-  /** cm offset across the stroke on the surface (+ = right of the arrow). */
-  across: number
-  /** Finger direction in the surface plane, degrees from the stroke direction (+ = toward across +). */
+  /**
+   * Where the palm sits around the limb, degrees from the arrow line (+ = right of the arrow).
+   * Which hand sits here follows from where the user is.
+   */
+  aroundDeg: number
+  /**
+   * Finger direction in the surface plane, degrees from the stroke direction (+ = toward aroundDeg +).
+   * Beyond 45 degrees the fingers wrap around the limb instead, away from the user.
+   */
   fingerYawDeg: number
-  /** How much the fingers wrap around the surface, degrees of total curl. */
+  /** The most the fingers may bend to wrap the surface, degrees (95 = a full grip). */
   curlDeg: number
+  /** Thumb tip rests on the arrow line, just ahead of the hand; otherwise on the nearest skin. */
+  thumbOnArrow: boolean
 }
 
 export interface SurfaceSpot {
@@ -65,10 +72,10 @@ export const PARTS: PartDef[] = [
     intensity: "medium",
     cue: "Both hands wrapped around the calf, thumbs on the back of the leg; glide along the arrow (ankle to knee).",
     hands: [
-      {side: "left", along: 0, across: -3.2, fingerYawDeg: -95, curlDeg: 70},
-      {side: "right", along: 0, across: 3.2, fingerYawDeg: 95, curlDeg: 70},
+      {along: 0, aroundDeg: -48, fingerYawDeg: -95, curlDeg: 95, thumbOnArrow: true},
+      {along: 0, aroundDeg: 48, fingerYawDeg: 95, curlDeg: 95, thumbOnArrow: true},
     ],
-    suggested: {start: {region: "leg", a: 31, b: 140}, end: {region: "leg", a: 9, b: 140}},
+    suggested: {start: {region: "leg", a: 31, b: 180}, end: {region: "leg", a: 9, b: 180}},
   },
   {
     id: "shin",
@@ -77,10 +84,10 @@ export const PARTS: PartDef[] = [
     intensity: "gentle",
     cue: "Palms flat on either side of the shinbone (not on the bone); glide along the arrow (ankle to knee).",
     hands: [
-      {side: "left", along: -1.5, across: -3.4, fingerYawDeg: -10, curlDeg: 15},
-      {side: "right", along: 1.5, across: 3.4, fingerYawDeg: 10, curlDeg: 15},
+      {along: -1.5, aroundDeg: -55, fingerYawDeg: 0, curlDeg: 35, thumbOnArrow: false},
+      {along: 1.5, aroundDeg: 55, fingerYawDeg: 0, curlDeg: 35, thumbOnArrow: false},
     ],
-    suggested: {start: {region: "leg", a: 32, b: 40}, end: {region: "leg", a: 9, b: 40}},
+    suggested: {start: {region: "leg", a: 32, b: 0}, end: {region: "leg", a: 9, b: 0}},
   },
   {
     id: "sole",
@@ -89,8 +96,8 @@ export const PARTS: PartDef[] = [
     intensity: "medium",
     cue: "Both thumbs on the sole; glide along the arrow (heel to toes).",
     hands: [
-      {side: "left", along: -1, across: -2.0, fingerYawDeg: -110, curlDeg: 85},
-      {side: "right", along: -1, across: 2.0, fingerYawDeg: 110, curlDeg: 85},
+      {along: -1, aroundDeg: -90, fingerYawDeg: -110, curlDeg: 95, thumbOnArrow: true},
+      {along: -1, aroundDeg: 90, fingerYawDeg: 110, curlDeg: 95, thumbOnArrow: true},
     ],
     suggested: {start: {region: "foot", a: 3.5, b: -90}, end: {region: "foot", a: 17.5, b: -90}},
   },

@@ -6,9 +6,12 @@ import {HandsOnC3SpotsScenario} from "./HandsOnC3SpotsScenario"
 import {HandsOnC4CalfScenario} from "./HandsOnC4CalfScenario"
 import {HandsOnC5SwitchOffScenario} from "./HandsOnC5SwitchOffScenario"
 import {HandsOnC6DirectionScenario} from "./HandsOnC6DirectionScenario"
+import {HandsOnShinHandsScenario} from "./HandsOnShinHandsScenario"
+import {HandsOnSoleHandsScenario} from "./HandsOnSoleHandsScenario"
 
 /**
- * LEAF scenario index for HandsOn: one scenario per done criterion in devpost/design-brief.md.
+ * LEAF scenario index for HandsOn: one scenario per done criterion in devpost/design-brief.md,
+ * plus the shin and sole ghost hands (criterion 4 covers the calf).
  */
 @component
 export class LeafIndex extends BaseScriptComponent {
@@ -20,5 +23,7 @@ export class LeafIndex extends BaseScriptComponent {
     {id: "handson-c4-calf", typename: HandsOnC4CalfScenario.getTypeName()},
     {id: "handson-c5-switch-off", typename: HandsOnC5SwitchOffScenario.getTypeName()},
     {id: "handson-c6-direction", typename: HandsOnC6DirectionScenario.getTypeName()},
+    {id: "handson-shin-hands", typename: HandsOnShinHandsScenario.getTypeName()},
+    {id: "handson-sole-hands", typename: HandsOnSoleHandsScenario.getTypeName()},
   ]
 }

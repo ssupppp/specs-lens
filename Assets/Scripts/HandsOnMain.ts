@@ -8,7 +8,8 @@
  *                                             --Off--> placeStart (guide + spots fade out)
  * Also: start-pose placement of the leg rig and the click/chime sounds.
  * Expects (@input): legModel (HandsOnLegModel on "Leg"), guideUI (HandsOnGuideUI),
- *   legRig (the movable "LegRig" unit), guideMaterial (additive unlit, vertex colour).
+ *   legRig (the movable "LegRig" unit), guideMaterial (additive unlit, vertex colour),
+ *   rightHandPrefab / leftHandPrefab (GhostHandR/L, SIK rigged hands) and handMaterial (lit) for the ghost hands.
  * Must not: author text or UIKit (HandsOnGuideUI does) or build leg geometry (HandsOnLegModel does).
  *
  * Observable state for tests: getStep(), getSpotCount(), getSpotPositions(), areChoicesVisible(),
@@ -40,7 +41,9 @@ const HINT_ABOVE_LEG_CM = 10
 const CHOICES_ABOVE_SPOT_CM = 8
 const LABEL_ABOVE_ARROW_CM = 8
 const SPOT_DIAMETER_CM = 2
-const GHOST_HAND_STRENGTH = 0.3
+const GHOST_HAND_STRENGTH = 0.6
+/** Ghost hands: light blue, lit (they're see-through, so the light leg shows through them). */
+const GHOST_HAND_TINT = new vec3(0.5, 0.68, 0.98)
 const ACTION_DEBOUNCE_S = 0.25
 /** Half the display's horizontal field of view, a little inside the edge (Specs ~16 deg). */
 const VIEW_HALF_ANGLE_DEG = 14
@@ -64,8 +67,20 @@ export class HandsOnMain extends BaseScriptComponent {
   legRig: SceneObject
 
   @input
-  @hint("Additive unlit vertex-colour material used for dots, arrows and ghost hands")
+  @hint("Additive unlit vertex-colour material used for dots and arrows")
   guideMaterial: Material
+
+  @input
+  @hint("GhostHandR prefab (SIK right hand model) for the guide's ghost hands")
+  rightHandPrefab: ObjectPrefab
+
+  @input
+  @hint("GhostHandL prefab (SIK left hand model) for the guide's ghost hands")
+  leftHandPrefab: ObjectPrefab
+
+  @input
+  @hint("Lit material for the ghost hands (cloned, tinted and made see-through)")
+  handMaterial: Material
   @ui.group_end
 
   @ui.separator
@@ -76,7 +91,7 @@ export class HandsOnMain extends BaseScriptComponent {
   placeAtStartPose: boolean = true
 
   @input("vec3", "{0.72, 0.87, 1.0}")
-  @hint("Guide colour for palm spots, arrows and ghost hands — light, cool tones only")
+  @hint("Guide colour for palm spots and arrows — light, cool tones only")
   @widget(new ColorWidget())
   guideColor: vec3
 
@@ -128,8 +143,8 @@ export class HandsOnMain extends BaseScriptComponent {
   private elapsed = 0
 
   onAwake(): void {
-    if (!this.legModel || !this.guideUI || !this.legRig || !this.guideMaterial) {
-      console.error("[HandsOn] Required @input not wired (legModel, guideUI, legRig, guideMaterial). Check the scene.")
+    if (!this.legModel || !this.guideUI || !this.legRig || !this.guideMaterial || !this.rightHandPrefab || !this.leftHandPrefab || !this.handMaterial) {
+      console.error("[HandsOn] Required @input not wired (legModel, guideUI, legRig, guideMaterial, hand prefabs, handMaterial). Check the scene.")
       return
     }
     const rt = this.legRig.getTransform()
@@ -347,8 +362,11 @@ export class HandsOnMain extends BaseScriptComponent {
       {position: legT.getWorldPosition(), rotation: legT.getWorldRotation()},
       {
         guideMaterial: this.guideMaterial,
+        handMaterial: this.handMaterial,
+        rightHandPrefab: this.rightHandPrefab,
+        leftHandPrefab: this.leftHandPrefab,
         arrowColor: new vec3(Math.min(1, this.guideColor.x + 0.12), Math.min(1, this.guideColor.y + 0.07), Math.min(1, this.guideColor.z)),
-        handColor: this.guideColor,
+        handColor: GHOST_HAND_TINT,
         checkColor: this.checkColor,
         ghostHandStrength: GHOST_HAND_STRENGTH,
         dragMinCm: this.dragMinCm,

@@ -10,6 +10,7 @@ import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interactio
 import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/CameraProvider/WorldCameraFinderProvider"
 import {DefaultLeafInteractor} from "Leaf.lspkg/Interactors/interactor/DefaultLeafInteractor"
 import {findInteractableByName} from "Leaf.lspkg/Interactors/InteractableUtils"
+import {expect} from "Leaf.lspkg/Utils/common/Expect"
 import {findSceneObjectByName, nextFrame, sleep} from "Leaf.lspkg/Utils/common/Utils"
 import {HandsOnMain} from "../../Scripts/HandsOnMain"
 
@@ -148,4 +149,31 @@ export async function ensureCalfGuide(main: HandsOnMain, ix: HandsOnLeafInteract
   const ok = await waitUntil(() => main.isGuideVisible(), 90)
   if (!ok) throw new Error("Calf guide did not appear")
   await sleep(300)
+}
+
+/**
+ * Place a guide for `partId` on its suggested spots and check both posed ghost hands appear near
+ * the arrow. Leaves the guide showing, so the pose can be inspected in the preview afterwards.
+ */
+export async function showPartGuide(partId: string, partName: string): Promise<void> {
+  await sleep(1000)
+  const main = getMain()
+  const ix = new HandsOnLeafInteractor()
+  await resetToStart(main, ix)
+  await ix.tapLeg(visibleSpot(main, partId, 0))
+  await ix.tapLeg(visibleSpot(main, partId, 1))
+  await ix.pinch("Choice_" + partName)
+  const shown = await waitUntil(() => main.isGuideVisible(), 90)
+  expect(shown, partName + " guide visible").toBe(true)
+  await waitFrames(15) // hands are posed one point along the stroke per frame
+  const a0 = main.getArrowStart()
+  const a1 = main.getArrowEnd()
+  for (const side of ["L", "R"]) {
+    const hand = findSceneObjectByName("GhostHand_" + partName + "_" + side)
+    expect(hand && hand.isEnabledInHierarchy, "GhostHand_" + partName + "_" + side).toBe(true)
+    const p = hand.getTransform().getWorldPosition()
+    const near = Math.min(p.distance(a0), p.distance(a1), p.distance(vec3.lerp(a0, a1, 0.5)))
+    log(partName + " hand " + side + " at " + v(p) + ", " + near.toFixed(1) + " cm from the arrow")
+    expect(near, side + " hand near the arrow (cm)").toBeLessThan(20)
+  }
 }

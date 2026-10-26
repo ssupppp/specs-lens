@@ -1127,6 +1127,9 @@
       guideUI: !<MappingBased.AssignableType_2> 9c69cf09-6d18-4ea6-8956-be361c00c34a
       legRig: !<reference.SceneObject> b9cd5241-aa4f-4e4b-a9bb-14df02130110
       guideMaterial: !<reference.Material> 6aa7429d-ceb0-423f-9c7b-f6cd06f3bdac
+      rightHandPrefab: !<reference.ObjectPrefab> 0d7767d7-4db5-4f00-b58c-bc432f9515a6
+      leftHandPrefab: !<reference.ObjectPrefab> 258ef61e-4937-4902-8753-642123e46194
+      handMaterial: !<reference.Material> e77d583a-aa5f-4413-af9c-acc63e74192a
       placeAtStartPose: true
       guideColor: !<Vec3> {x: 0.720000, y: 0.870000, z: 1.000000}
       checkColor: !<Vec3> {x: 0.400000, y: 1.000000, z: 0.550000}
