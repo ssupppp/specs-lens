@@ -42,6 +42,8 @@ export interface HandPose {
   thumbLeadCm?: number
   /** How far to its own side of the arrow line the thumb tip rests, cm (default 0.9). */
   thumbAcrossCm?: number
+  /** Instead of thumbAcrossCm: degrees around the limb from the arrow line, so the gap shrinks with the leg. */
+  thumbAroundDeg?: number
 }
 
 export interface SurfaceSpot {
@@ -66,11 +68,14 @@ export interface PartDef {
   suggested: {start: SurfaceSpot; end: SurfaceSpot}
 }
 
-/** Stroke timing and hand depth per intensity (gentle slower + hovering, firm faster + sunk). */
-export const INTENSITY_PROFILE: Record<Intensity, {strokeSeconds: number; liftCm: number}> = {
-  gentle: {strokeSeconds: 3.5, liftCm: 0.9},
-  medium: {strokeSeconds: 3.0, liftCm: 0.25},
-  firm: {strokeSeconds: 2.5, liftCm: -0.45},
+/**
+ * Stroke timing and hand depth per intensity (gentle slower + hovering, firm faster + sunk).
+ * pressCm = how far the hands sink into the skin at a press point.
+ */
+export const INTENSITY_PROFILE: Record<Intensity, {strokeSeconds: number; liftCm: number; pressCm: number}> = {
+  gentle: {strokeSeconds: 4.2, liftCm: 0.9, pressCm: 0.5},
+  medium: {strokeSeconds: 3.8, liftCm: 0.25, pressCm: 0.8},
+  firm: {strokeSeconds: 3.2, liftCm: -0.45, pressCm: 1.1},
 }
 
 export const PARTS: PartDef[] = [
@@ -82,8 +87,8 @@ export const PARTS: PartDef[] = [
     pose: "faceDown",
     cue: "Palms hug the sides of the calf, fingers pointing up toward the knee; both thumbs side by side on the centre line, gliding along the arrow (ankle to knee).",
     hands: [
-      {along: -4, aroundDeg: -62, fingerYawDeg: -8, curlDeg: 60, thumbOnArrow: true, thumbLeadCm: 7, thumbAcrossCm: 1.5},
-      {along: -4, aroundDeg: 62, fingerYawDeg: 8, curlDeg: 60, thumbOnArrow: true, thumbLeadCm: 7, thumbAcrossCm: 1.5},
+      {along: -4, aroundDeg: -62, fingerYawDeg: -8, curlDeg: 60, thumbOnArrow: true, thumbLeadCm: 7, thumbAroundDeg: 58},
+      {along: -4, aroundDeg: 62, fingerYawDeg: 8, curlDeg: 60, thumbOnArrow: true, thumbLeadCm: 7, thumbAroundDeg: 58},
     ],
     suggested: {start: {region: "leg", a: 31, b: 180}, end: {region: "leg", a: 9, b: 180}},
   },

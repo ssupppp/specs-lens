@@ -4,8 +4,8 @@ import {findSceneObjectByName, findSceneObjectsByName, sleep} from "Leaf.lspkg/U
 import {HandsOnLeafInteractor, START_HINT, atStart, camTransform, getMain, log, resetToStart, v} from "./HandsOnTestKit"
 
 /**
- * Criterion 1 — on open: leg face down on the bed 60-70 cm away, below the eyes where the user
- * looks (the preview camera looks ~55 deg down); "Calf · Shin · Sole" and the "Pick the part"
+ * Criterion 1 — on open: leg face down on the bed ~90 cm away (whole lower leg in view), below the
+ * eyes where the user looks (the preview camera looks ~75 deg down); "Calf · Shin · Sole" and the "Pick the part"
  * hint above it, clear of the foot. Observes state only (run right after a preview refresh for
  * the true "Lens opens" state; otherwise it resets to the start with real pinches first).
  */
@@ -35,8 +35,8 @@ export class HandsOnC1OpenScenario extends Scenario {
     const below = camPos.y - legCenter.y
     log("C1: cam " + v(camPos) + " legCenter " + v(legCenter) + " dist=" + dist.toFixed(1) + " offGaze=" + offGaze.toFixed(1) + " below=" + below.toFixed(1))
 
-    expect(dist, "leg distance from the eyes (cm)").toBeGreaterThan(55)
-    expect(dist, "leg distance from the eyes (cm)").toBeLessThan(80)
+    expect(dist, "leg distance from the eyes (cm)").toBeGreaterThan(80)
+    expect(dist, "leg distance from the eyes (cm)").toBeLessThan(110)
     expect(offGaze, "leg angle off the gaze (deg)").toBeLessThan(15)
     expect(below, "leg below eye level, seen from above (cm)").toBeGreaterThan(35)
 

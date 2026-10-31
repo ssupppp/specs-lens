@@ -41,9 +41,17 @@ const HINT_ABOVE_LEG_CM = 10
 /** Where the calf's middle sits along the shank, knee (0) to ankle (1). */
 const CALF_MIDDLE_FRACTION = 0.4
 const CHOICES_ABOVE_LEG_CM = 8
-/** The technique label sits past the arrowhead (off the hands, like a caption at the top of the view). */
-const LABEL_AHEAD_CM = 7
+/** Hint sits this far (on screen) above the choice row: clears the chips and the hint's own height. */
+const HINT_ABOVE_CHOICES_CM = 6
+/**
+ * The technique label sits beside the leg, level with the middle of the stroke: this far from the arrow
+ * to the label's near edge (clears the leg and the ghost hands), then its own half width on top.
+ * At ~105 cm the display is wide enough for it; at 60 cm it was not, hence the old "past the arrowhead".
+ */
+const LABEL_SIDE_GAP_CM = 11
 const LABEL_LIFT_CM = 2
+/** Arrow and press points: Snap's warm gold accent, light so it reads on the additive display. */
+const ARROW_GOLD = new vec3(1.0, 0.62, 0.1)
 const SPOT_DIAMETER_CM = 2
 const GHOST_HAND_STRENGTH = 0.6
 /** Ghost hands: light blue, lit (they're see-through, so the light leg shows through them). */
@@ -96,8 +104,8 @@ export class HandsOnMain extends BaseScriptComponent {
 
   @input
   @hint("How far along the gaze the middle of the calf is placed at start, cm")
-  @widget(new SliderWidget(40, 100, 1))
-  focusDistanceCm: number = 60
+  @widget(new SliderWidget(40, 120, 1))
+  focusDistanceCm: number = 105
 
   @input("vec3", "{0.72, 0.87, 1.0}")
   @hint("Guide colour for palm spots and arrows — light, cool tones only")
@@ -367,7 +375,7 @@ export class HandsOnMain extends BaseScriptComponent {
         handMaterial: this.handMaterial,
         rightHandPrefab: this.rightHandPrefab,
         leftHandPrefab: this.leftHandPrefab,
-        arrowColor: new vec3(Math.min(1, this.guideColor.x + 0.12), Math.min(1, this.guideColor.y + 0.07), Math.min(1, this.guideColor.z)),
+        arrowColor: ARROW_GOLD,
         handColor: GHOST_HAND_TINT,
         checkColor: this.checkColor,
         ghostHandStrength: GHOST_HAND_STRENGTH,
@@ -379,7 +387,7 @@ export class HandsOnMain extends BaseScriptComponent {
     guide.onDirectionMatched = () => this.play(this.sfxChime)
     this.guide = guide
     this.chosen = part
-    this.guideUI.showLabel(part.label, this.keepInView(guide.aheadAnchorWorld(LABEL_AHEAD_CM, LABEL_LIFT_CM), this.guideUI.getLabelWidthCm() / 2))
+    this.guideUI.showLabel(part.label, this.keepInView(guide.sideAnchorWorld(LABEL_SIDE_GAP_CM + this.guideUI.getLabelWidthCm() / 2, LABEL_LIFT_CM), this.guideUI.getLabelWidthCm() / 2))
     console.log("[HandsOn] guide on: " + part.id + " (" + part.label + "), arrow " + path.length.toFixed(1) + " cm")
     this.setStep("guide")
   }
@@ -407,21 +415,23 @@ export class HandsOnMain extends BaseScriptComponent {
 
   // ── placement ──
 
-  /** ~8 cm above the middle of the leg; when reopened from the label, above the label instead. */
-  private choicesWorldPosition(fromLabel: boolean): vec3 {
-    if (fromLabel) return this.guideUI.getLabelWorldPosition().add(new vec3(0, 4, 0))
-    return this.legTopWorld().add(new vec3(0, CHOICES_ABOVE_LEG_CM, 0))
+  /** The camera's up, so "above" means up on screen even when the camera looks steeply down. */
+  private camUp(): vec3 {
+    return this.camera ? this.camera.up : vec3.up()
   }
 
-  /** ~10 cm above the middle of the leg (clear of the foot); raised if the choice row sits there. */
+  /** ~8 cm above the middle of the leg; when reopened from the label, above the label instead. */
+  private choicesWorldPosition(fromLabel: boolean): vec3 {
+    if (fromLabel) return this.guideUI.getLabelWorldPosition().add(this.camUp().uniformScale(4))
+    return this.legTopWorld().add(this.camUp().uniformScale(CHOICES_ABOVE_LEG_CM))
+  }
+
+  /** ~10 cm above the middle of the leg (clear of the foot); above the choice row when it is showing. */
   private hintWorldPosition(): vec3 {
-    let p = this.legTopWorld().add(new vec3(0, HINT_ABOVE_LEG_CM, 0))
     if (this.guideUI.areChoicesVisible()) {
-      const c = this.guideUI.getChoiceWorldPosition()
-      const dx = Math.abs(c.x - p.x)
-      if (dx < 16 && Math.abs(c.y - p.y) < 4.5) p = new vec3(p.x, c.y + 4.5, p.z)
+      return this.guideUI.getChoiceWorldPosition().add(this.camUp().uniformScale(HINT_ABOVE_CHOICES_CM))
     }
-    return p
+    return this.legTopWorld().add(this.camUp().uniformScale(HINT_ABOVE_LEG_CM))
   }
 
   /** Slide a floating row sideways (in the view) so all of it stays inside the display. */

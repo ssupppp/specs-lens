@@ -15,9 +15,9 @@
  */
 import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable"
 import {InteractableManipulation} from "SpectaclesInteractionKit.lspkg/Components/Interaction/InteractableManipulation/InteractableManipulation"
-import {INTENSITY_PROFILE, PartDef} from "./HandsOnParts"
+import {HandPose, INTENSITY_PROFILE, PartDef} from "./HandsOnParts"
 import {HandSpec, HandsOnHandPoser, Side, allTransforms, ghostHandMaterial, useFullMesh} from "./HandsOnHandPoser"
-import {ArrowMesh, StrokePath, SurfaceSample, V3, add, buildArrowMesh, buildDiscMesh, dot, scale, sub, toVec3} from "./HandsOnLegGeometry"
+import {ArrowMesh, StrokePath, SurfaceSample, V3, add, buildChevronMesh, buildDiscMesh, dot, scale, sub, toVec3} from "./HandsOnLegGeometry"
 
 export interface GuideLook {
   guideMaterial: Material
@@ -38,15 +38,37 @@ const FADE_SECONDS = 0.3
 const STROKE_PAUSE = 0.5
 const HAND_FADE = 0.25
 const DEG = Math.PI / 180
-/** Points along the stroke where the hands are posed; they blend between these while looping. */
-const POSE_KEYS = 6
+/** Press points along the stroke: about one per this many cm of thumb travel, kept between the limits. The hands are posed at each. */
+const STATION_SPACING_CM = 6
+const MIN_STATIONS = 2
+const MAX_STATIONS = 6
+/** One stroke = press, glide, press, glide ... press. Relative lengths of a press and of a glide. */
+const PRESS_UNITS = 0.3
+const GLIDE_UNITS = 0.5
+/** Pressure while gliding (1 = fully sunk, as at a press point). */
+const PRESS_GLIDING = 0.45
 /** Fingers set within this angle of the stroke point that way; beyond it they wrap the limb. */
 const WRAP_YAW_DEG = 45
 /** Thumbs on the arrow rest this far ahead of the palm (unless the grip sets thumbLeadCm), either side of the line. */
 const THUMB_LEAD_CM = 1.5
 const THUMB_ACROSS_CM = 0.9
-const ARROW_WIDTH_CM = 3
+/** A thumb may lead the palm by at most this share of the stroke, so short strokes still move forward. */
+const MAX_LEAD_FRACTION = 0.6
+/** The direction cue: a chain of ">" chevrons along the stroke with a pulse flowing the way the hands go. */
+const CHEVRON_SPACING_CM = 3.0
+const CHEVRON_HALF_WIDTH_CM = 2.2
+const CHEVRON_DEPTH_CM = 1.7
+const CHEVRON_THICK_CM = 0.75
+/** What chevrons and press points the hands have passed turn into (pale yellow), and how fully. */
+const PASSED_TINT = new vec3(1.0, 0.96, 0.62)
+const PASSED_MIX = 0.85
+/** Gap kept between a chevron and the tail dot / a press point (a pressed point swells to ~1.3 cm). */
+const CHEVRON_CLEAR_CM = 1.4
+/** Flow pulse: chevrons per pulse, and pulses passing per second. */
+const FLOW_CHEVRONS = 4
+const FLOW_HZ = 0.9
 const ARROW_LIFT_CM = 0.45
+const STATION_RADIUS_CM = 0.9
 
 export class HandsOnGuide {
   readonly part: PartDef
@@ -78,8 +100,13 @@ export class HandsOnGuide {
   private readonly flipFingers: boolean[] = []
   /** Per hand: every transform in the rig (index 0 = the hand itself) and its rest pose. */
   private readonly rigs: {joints: Transform[]; restPos: vec3; restRot: quat[]}[] = []
-  /** Per hand, per pose key: the hand's position and every joint's rotation (local). */
-  private readonly keys: {pos: vec3; rot: quat[]}[][] = []
+  /** Per hand, per press point: the hand's position, the skin normal there, and every joint's rotation (local). */
+  private readonly keys: {pos: vec3; n: vec3; rot: quat[]}[][] = []
+  /** Number of glides in a stroke; there are stations + 1 press points. */
+  private readonly stations: number
+  /** Press-point discs along the arrow, and their materials. */
+  private readonly stationObjs: SceneObject[] = []
+  private readonly stationMats: Material[] = []
   private readonly arrow: ArrowMesh
   private readonly handleRestLocal: vec3
   private readonly strokeDirLocal: vec3
@@ -93,16 +120,34 @@ export class HandsOnGuide {
     private readonly camera: Transform,
   ) {
     this.part = part
+    // spaced by how far the thumbs travel (the stroke less the thumb's lead), so each gap has room for a chevron
+    const travelCm = path.length * (1 - this.leadFraction(part.hands[0]))
+    this.stations = Math.max(MIN_STATIONS, Math.min(MAX_STATIONS, Math.round(travelCm / STATION_SPACING_CM)))
     this.root = this.makeObject(container, "Guide_" + part.name)
     const rt = this.root.getTransform()
     rt.setWorldPosition(legPose.position)
     rt.setWorldRotation(legPose.rotation)
 
-    // ── arrow along the surface ──
+    // ── arrow along the surface, with a disc at every press point ──
     const arrowObj = this.makeObject(this.root, "Arrow_" + part.name)
-    this.arrow = buildArrowMesh(path, ARROW_WIDTH_CM, ARROW_LIFT_CM)
+    // the chevrons fill the gaps between the tail and the press points
+    const anchors = [0]
+    for (let i = 0; i <= this.stations; i++) anchors.push(this.stationS(i))
+    this.arrow = buildChevronMesh(path, CHEVRON_SPACING_CM, CHEVRON_HALF_WIDTH_CM, CHEVRON_DEPTH_CM, CHEVRON_THICK_CM, ARROW_LIFT_CM, anchors, CHEVRON_CLEAR_CM)
     this.arrowMat = look.guideMaterial.clone()
     this.addVisual(arrowObj, this.arrow.builder.getMesh(), this.arrowMat)
+    const discMesh = buildDiscMesh(STATION_RADIUS_CM).getMesh()
+    for (let i = 0; i <= this.stations; i++) {
+      const at = path.offset(this.stationS(i), 0, ARROW_LIFT_CM + 0.1)
+      const so = this.makeObject(this.root, "Press_" + part.name + "_" + i)
+      const st = so.getTransform()
+      st.setLocalPosition(toVec3(at.p))
+      st.setLocalRotation(this.basisRotation(toVec3(at.n), toVec3(at.t)))
+      const mat = look.guideMaterial.clone()
+      this.addVisual(so, discMesh, mat)
+      this.stationObjs.push(so)
+      this.stationMats.push(mat)
+    }
 
     // ── ghost hands: the one further to the user's right is the right hand ──
     this.poser = new HandsOnHandPoser(path.shape, rt, camera)
@@ -200,6 +245,17 @@ export class HandsOnGuide {
     return new vec3(at.x, top + liftCm, at.z)
   }
 
+  /**
+   * Beside the leg: the middle of the stroke, `sideCm` toward the user's right on screen. Clear of the
+   * hands and the leg, so a caption there never sits on either.
+   */
+  sideAnchorWorld(sideCm: number, liftCm: number): vec3 {
+    const mid = this.toWorld(this.path.at(0.5).p)
+    const right = this.camera.right
+    const flat = new vec3(right.x, 0, right.z).normalize()
+    return mid.add(flat.uniformScale(sideCm)).add(new vec3(0, liftCm, 0))
+  }
+
   update(dt: number): void {
     if (this.destroyed) return
     const target = this.fadingOut ? 0 : 1
@@ -210,7 +266,7 @@ export class HandsOnGuide {
       this.root.destroy()
       return
     }
-    if (this.keys[0].length < POSE_KEYS) this.poseNextKey()
+    if (this.keys[0].length <= this.stations) this.poseNextKey()
     this.time += dt
     this.updateDrag(dt)
     this.updateStroke()
@@ -218,58 +274,116 @@ export class HandsOnGuide {
 
   // ── stroke loop: ghost hands + arrow shimmer ──
 
+  /**
+   * Where the stroke is `t` seconds in: `u` = press point reached so far (0..stations, fractional while
+   * gliding to the next one) and `press` = how hard the hands bear down (peaks at each press point).
+   */
+  private strokeAt(t: number): {u: number; press: number} {
+    const N = this.stations
+    const D = INTENSITY_PROFILE[this.part.intensity].strokeSeconds
+    let x = (t / D) * ((N + 1) * PRESS_UNITS + N * GLIDE_UNITS)
+    for (let i = 0; i <= N; i++) {
+      if (x < PRESS_UNITS) return {u: i, press: PRESS_GLIDING + (1 - PRESS_GLIDING) * Math.sin(Math.PI * (x / PRESS_UNITS))}
+      x -= PRESS_UNITS
+      if (i === N) break
+      if (x < GLIDE_UNITS) return {u: i + 0.5 - 0.5 * Math.cos(Math.PI * (x / GLIDE_UNITS)), press: PRESS_GLIDING}
+      x -= GLIDE_UNITS
+    }
+    return {u: N, press: PRESS_GLIDING}
+  }
+
   private updateStroke(): void {
     const prof = INTENSITY_PROFILE[this.part.intensity]
     const D = prof.strokeSeconds
+    const N = this.stations
     const cycle = D + STROKE_PAUSE + 2 * HAND_FADE
     const t = this.time % cycle
-    let prog = 1
+    let u = N
+    let press = 0
     let handFade = 1
     let shimmer = 0
     if (t < D) {
-      prog = 0.5 - 0.5 * Math.cos(Math.PI * (t / D)) // ease-in / ease-out
+      const s = this.strokeAt(t)
+      u = s.u
+      press = s.press
       shimmer = 1
     } else if (t < D + STROKE_PAUSE) {
-      prog = 1
+      press = PRESS_GLIDING * (1 - (t - D) / STROKE_PAUSE) // ease off after the last press
     } else if (t < D + STROKE_PAUSE + HAND_FADE) {
-      prog = 1
       handFade = 1 - (t - D - STROKE_PAUSE) / HAND_FADE
     } else {
-      prog = 0
+      u = 0
+      press = PRESS_GLIDING
       handFade = (t - D - STROKE_PAUSE - HAND_FADE) / HAND_FADE
     }
+    const prog = u / N
 
-    // ghost hands ride the stroke, blending between the poses along it (hidden until all are posed)
-    const ready = this.keys[0].length >= POSE_KEYS
+    // ghost hands ride the stroke, blending between the poses at the press points (hidden until all are posed)
+    const ready = this.keys[0].length > N
     if (ready) {
-      const f = prog * (POSE_KEYS - 1)
-      const k0 = Math.min(POSE_KEYS - 2, Math.floor(f))
-      const w = f - k0
+      const k0 = Math.min(N - 1, Math.floor(u))
+      const w = u - k0
       for (let i = 0; i < this.hands.length; i++) {
         const a = this.keys[i][k0]
         const b = this.keys[i][k0 + 1]
         const joints = this.rigs[i].joints
-        joints[0].setLocalPosition(vec3.lerp(a.pos, b.pos, w))
+        // bearing down = sinking along the skin normal
+        const sink = vec3.lerp(a.n, b.n, w).uniformScale(prof.pressCm * press)
+        joints[0].setLocalPosition(vec3.lerp(a.pos, b.pos, w).sub(sink))
         for (let j = 0; j < joints.length; j++) joints[j].setLocalRotation(quat.slerp(a.rot[j], b.rot[j], w))
       }
     }
     const hk = ready ? this.alpha * handFade : 0
     const c = this.look.handColor
-    this.handMat.mainPass.baseColor = new vec4(c.x * hk, c.y * hk, c.z * hk, this.look.ghostHandStrength * hk)
+    this.handMat.mainPass.baseColor = new vec4(c.x * hk, c.y * hk, c.z * hk, Math.min(0.9, this.look.ghostHandStrength * (1 + 0.3 * press)) * hk)
 
-    // arrow colour: neutral pale blue <-> green, with a shimmer travelling with the hands
+    // press points: dim until the hands reach them, then flare and swell while pressed
+    const gold = this.look.arrowColor
+    for (let i = 0; i < this.stationObjs.length; i++) {
+      const pulse = Math.max(0, 1 - Math.abs(u - i) * 2.5) * press
+      const visited = u >= i - 0.01 ? 1 : 0
+      const k = Math.min(1.1, 0.35 + 0.35 * visited + 0.6 * pulse) * this.alpha
+      const m = visited * PASSED_MIX
+      this.stationMats[i].mainPass.baseColor = new vec4(
+        (gold.x + (PASSED_TINT.x - gold.x) * m) * k,
+        (gold.y + (PASSED_TINT.y - gold.y) * m) * k,
+        (gold.z + (PASSED_TINT.z - gold.z) * m) * k,
+        1,
+      )
+      const sc = 1 + 0.4 * pulse
+      this.stationObjs[i].getTransform().setLocalScale(new vec3(sc, sc, sc))
+    }
+
+    // arrow colour: gold <-> green, with a shimmer travelling with the hands
     const n = this.look.arrowColor
     const g = this.look.checkColor
     const gm = this.green
     const base = [n.x + (g.x - n.x) * gm, n.y + (g.y - n.y) * gm, n.z + (g.z - n.z) * gm]
     const a = this.arrow
     const verts = a.vertexS.length
+    // where the thumbs are on the path (the press points are spaced between lead and the head)
+    const lead = this.leadFraction(this.part.hands[0])
+    const thumbS = lead + prog * (1 - lead)
+    const flowGain = 0.45 + 0.55 * shimmer
     for (let v = 0; v < verts; v++) {
       const sv = a.vertexS[v]
-      const glow = 0.5 + 0.7 * shimmer * Math.exp(-Math.pow((sv - prog) / 0.08, 2))
-      const k = Math.min(1.2, glow) * this.alpha
+      // chevrons the thumbs have passed light up and stay lit; the ones still ahead stay dim, with a pulse
+      // running along them the way the hands go and a glow just in front of the thumbs
+      const lit = Math.max(0, Math.min(1, (thumbS - sv) / 0.05 + 0.5))
+      const phase = (sv * this.path.length) / CHEVRON_SPACING_CM / FLOW_CHEVRONS - this.time * FLOW_HZ
+      const flow = Math.pow(0.5 + 0.5 * Math.cos(2 * Math.PI * phase), 3)
+      const ahead = shimmer * Math.exp(-Math.pow((sv - thumbS - 0.05) / 0.1, 2))
+      const k = Math.min(1.1, 0.25 + 0.6 * lit + (1 - lit) * (0.4 * flowGain * flow + 0.5 * ahead)) * this.alpha
+      // passed chevrons change colour (amber -> pale yellow), not just brightness; the green check overrides
+      const m = lit * (1 - gm) * PASSED_MIX
       const d = a.baseData
-      a.builder.setVertexInterleaved(v, [d[v * 6], d[v * 6 + 1], d[v * 6 + 2], d[v * 6 + 3], d[v * 6 + 4], d[v * 6 + 5], base[0] * k, base[1] * k, base[2] * k, 1])
+      a.builder.setVertexInterleaved(v, [
+        d[v * 6], d[v * 6 + 1], d[v * 6 + 2], d[v * 6 + 3], d[v * 6 + 4], d[v * 6 + 5],
+        (base[0] + (PASSED_TINT.x - base[0]) * m) * k,
+        (base[1] + (PASSED_TINT.y - base[1]) * m) * k,
+        (base[2] + (PASSED_TINT.z - base[2]) * m) * k,
+        1,
+      ])
     }
     a.builder.updateMesh()
     this.arrowMat.mainPass.baseColor = new vec4(1, 1, 1, 1)
@@ -281,18 +395,44 @@ export class HandsOnGuide {
   private handSpecs(prog: number): HandSpec[] {
     const len = this.path.length
     return this.part.hands.map((pose, i) => {
-      const s = Math.max(0, Math.min(1, prog + pose.along / len))
+      // A hand with its thumb on the arrow moves as one piece: palm from the tail, thumb tip from `lead`
+      // ahead of it to the arrowhead. (The path stops at its ends: a thumb pinned at the head while the
+      // palm kept coming folded up.)
+      const lead = this.leadFraction(pose)
+      const s = pose.thumbOnArrow ? prog * (1 - lead) : Math.max(0, Math.min(1, prog + pose.along / len))
       const o = this.path.offset(s, 0, 0)
       const yaw = (pose.fingerYawDeg + (this.flipFingers[i] ? 180 : 0)) * DEG
-      const thumbS = Math.max(0, Math.min(1, s + (pose.thumbLeadCm ?? THUMB_LEAD_CM) / len))
+      const thumbS = Math.min(1, s + lead)
       return {
         palm: this.aroundArrow(o, pose.aroundDeg),
         fingers: Math.abs(pose.fingerYawDeg) > WRAP_YAW_DEG ? undefined : add(scale(o.t, Math.cos(yaw)), scale(o.right, Math.sin(yaw))),
         fingersFixed: true,
-        thumbTarget: pose.thumbOnArrow ? this.path.offset(thumbS, Math.sign(pose.aroundDeg) * (pose.thumbAcrossCm ?? THUMB_ACROSS_CM), 0).p : undefined,
+        thumbTarget: pose.thumbOnArrow ? this.thumbTarget(pose, thumbS) : undefined,
         maxCurlDeg: pose.curlDeg,
       }
     })
+  }
+
+  /**
+   * Where the thumb tip rests, on its own side of the arrow line. By angle around the limb when the grip gives
+   * one (so the two thumbs keep apart where the leg narrows toward the ankle), otherwise by cm across.
+   */
+  private thumbTarget(pose: HandPose, thumbS: number): V3 {
+    const side = Math.sign(pose.aroundDeg)
+    if (pose.thumbAroundDeg !== undefined) return this.aroundArrow(this.path.offset(thumbS, 0, 0), side * pose.thumbAroundDeg).p
+    return this.path.offset(thumbS, side * (pose.thumbAcrossCm ?? THUMB_ACROSS_CM), 0).p
+  }
+
+  /** How far the thumb tip leads the palm, as a share of the stroke (0 when the thumb is off the arrow). */
+  private leadFraction(pose: HandPose): number {
+    if (!pose.thumbOnArrow) return 0
+    return Math.min(MAX_LEAD_FRACTION, (pose.thumbLeadCm ?? THUMB_LEAD_CM) / this.path.length)
+  }
+
+  /** Path position of press point `i`: where the thumbs press (or the palm, with no thumb on the arrow). */
+  private stationS(i: number): number {
+    const lead = this.leadFraction(this.part.hands[0])
+    return lead + (i / this.stations) * (1 - lead)
   }
 
   /** The skin `deg` degrees around the limb from the arrow point `o` (+ = right of the arrow). */
@@ -312,7 +452,7 @@ export class HandsOnGuide {
       rig.joints[0].setLocalPosition(rig.restPos)
       rig.joints.forEach((t, j) => t.setLocalRotation(rig.restRot[j]))
     }
-    const specs = this.handSpecs(k / (POSE_KEYS - 1))
+    const specs = this.handSpecs(k / this.stations)
     this.poser.pose(specs, this.hands, this.sides)
     // gentle hovers just off the skin, firm sinks in a little
     const lift = INTENSITY_PROFILE[this.part.intensity].liftCm
@@ -321,7 +461,7 @@ export class HandsOnGuide {
       const ht = this.hands[i].getTransform()
       const n = m.multiplyDirection(toVec3(specs[i].palm.n)).normalize()
       ht.setWorldPosition(ht.getWorldPosition().add(n.uniformScale(lift)))
-      this.keys[i].push({pos: ht.getLocalPosition(), rot: this.rigs[i].joints.map((t) => t.getLocalRotation())})
+      this.keys[i].push({pos: ht.getLocalPosition(), n: toVec3(specs[i].palm.n), rot: this.rigs[i].joints.map((t) => t.getLocalRotation())})
     }
   }
 

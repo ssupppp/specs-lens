@@ -53,16 +53,19 @@ export class HandsOnC4CalfScenario extends Scenario {
       samples.push(t.getWorldPosition())
       await sleep(250) // 7 s window > one 4.5 s cycle
     }
-    const toEnd = samples.map((p) => p.distance(a1))
-    const toStart = samples.map((p) => p.distance(a0))
+    // How far along the arrow (0 = start, 1 = end) the hand object is. That object is the wrist, a fixed few cm
+    // behind the palm, and the hand moves with its thumb leading, so it never lands on the arrowhead. Judge
+    // its travel from its own lowest point: it must cover over half the arrow, then come back (a loop).
+    const axis = a1.sub(a0)
+    const along = samples.map((p) => p.sub(a0).dot(axis) / axis.dot(axis))
+    const lo = Math.min(...along)
     let travel = 0
     for (let i = 1; i < samples.length; i++) travel += samples[i].distance(samples[i - 1])
-    // first time near the end, then later near the start again = a loop
     let iEnd = -1
-    for (let i = 0; i < toEnd.length; i++) if (toEnd[i] < toStart[i] && iEnd < 0 && toStart[i] > 6) iEnd = i
+    for (let i = 0; i < along.length; i++) if (along[i] - lo > 0.5 && iEnd < 0) iEnd = i
     let loopedBack = false
-    if (iEnd >= 0) for (let i = iEnd + 1; i < toStart.length; i++) if (toStart[i] < toEnd[i] && toEnd[i] > 6) loopedBack = true
-    log("C4: ghost hand path travel " + travel.toFixed(1) + " cm, reached end at sample " + iEnd + ", looped back " + loopedBack)
+    if (iEnd >= 0) for (let i = iEnd + 1; i < along.length; i++) if (along[i] - lo < 0.15) loopedBack = true
+    log("C4: ghost hand path travel " + travel.toFixed(1) + " cm, along-arrow range " + Math.min(...along).toFixed(2) + ".." + Math.max(...along).toFixed(2) + ", reached end at sample " + iEnd + ", looped back " + loopedBack)
     expect(travel, "ghost hand travel over 7 s (cm)").toBeGreaterThan(10)
     expect(iEnd >= 0, "ghost hand reaches the arrow end").toBe(true)
     expect(loopedBack, "ghost hand returns to the start (loop)").toBe(true)

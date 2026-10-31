@@ -588,6 +588,56 @@ export function buildArrowMesh(path: StrokePath, widthCm: number, liftCm: number
   return {builder: acc.build(), vertexS, baseData}
 }
 
+/**
+ * A chain of chevrons (">" shapes pointing along the stroke) lying on the surface along `path`. Each is
+ * `halfWidthCm` out to either side, `depthCm` front to back, `thickCm` thick.
+ * The chain fills the gaps between `anchorsS` (path positions of things drawn on the line, sorted, such as the
+ * press-point discs), keeping `clearCm` clear of each and spaced about `spacingCm`, so nothing overlaps.
+ * Colours can be rewritten per frame (vertexS = the chevron's path position), so a pulse can run along them.
+ */
+export function buildChevronMesh(path: StrokePath, spacingCm: number, halfWidthCm: number, depthCm: number, thickCm: number, liftCm: number, anchorsS: number[], clearCm: number): ArrowMesh {
+  const acc = new MeshAccumulator()
+  const vertexS: number[] = []
+  const len = path.length
+  const centres: number[] = []
+  for (let g = 0; g + 1 < anchorsS.length; g++) {
+    const from = anchorsS[g] * len + clearCm
+    const room = anchorsS[g + 1] * len - clearCm - from
+    if (room < depthCm) continue
+    const k = Math.floor((room - depthCm) / spacingCm) + 1
+    for (let j = 0; j < k; j++) {
+      const along = k === 1 ? from + room / 2 : from + depthCm / 2 + (j * (room - depthCm)) / (k - 1)
+      centres.push(along / len)
+    }
+  }
+  for (const c of centres) {
+    const front = Math.min(1, c + depthCm / 2 / len)
+    const back = Math.max(0, c - depthCm / 2 / len)
+    const inset = thickCm / len
+    const pt = (s: number, across: number) => path.offset(Math.max(0, Math.min(1, s)), across, liftCm)
+    const corners = [pt(front, 0), pt(back, -halfWidthCm), pt(back, halfWidthCm), pt(front - inset, 0), pt(back - inset, -halfWidthCm), pt(back - inset, halfWidthCm)]
+    const ids = corners.map((p) => acc.addVertex(p.p, p.n, WHITE))
+    for (let k = 0; k < 6; k++) vertexS.push(c)
+    const [tipO, leftO, rightO, tipI, leftI, rightI] = ids
+    const quads: [number, number, number][] = [
+      [tipO, leftO, leftI],
+      [tipO, leftI, tipI],
+      [tipO, tipI, rightI],
+      [tipO, rightI, rightO],
+    ]
+    // both windings, so it shows whichever way the surface faces the camera
+    for (const [a, b, d] of quads) {
+      acc.addTri(a, b, d)
+      acc.addTri(a, d, b)
+    }
+  }
+  const baseData: number[] = []
+  for (let v = 0; v < acc.count; v++) {
+    for (let k = 0; k < 6; k++) baseData.push(acc.data[v * 10 + k])
+  }
+  return {builder: acc.build(), vertexS, baseData}
+}
+
 /** Soft round dot in the local XY plane, facing +Z (bright centre, fading rim). */
 export function buildDiscMesh(radiusCm: number): MeshBuilder {
   const acc = new MeshAccumulator()
