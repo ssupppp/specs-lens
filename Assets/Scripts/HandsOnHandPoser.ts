@@ -47,6 +47,8 @@ export interface HandSpec {
   maxCurlDeg: number
   /** Keep the thumb open in the hand's natural pose instead of bending it onto the skin. */
   thumbOpen?: boolean
+  /** With thumbOpen: Leg-local direction the straight open thumb points (along the stroke), so the two thumbs run side by side. */
+  thumbDir?: V3
 }
 
 /** A hand placed and seated on the leg, waiting for its fingers and thumb. */
@@ -112,6 +114,7 @@ export class HandsOnHandPoser {
         : null
       for (const f of FINGERS) this.wrapFinger(me.hand, f, me.palmDir, me.spec.maxCurlDeg, keep)
       if (!me.spec.thumbOpen) this.seatThumb(me.hand, me.spec.thumbTarget ?? null)
+      else if (me.spec.thumbDir) this.pointThumb(me.hand, me.spec.thumbDir, me.spec.palm.n)
     }
   }
 
@@ -321,6 +324,22 @@ export class HandsOnHandPoser {
       chain.forEach((o, k) => o.getTransform().setLocalRotation(rest[k]))
       this.aimThumb(chain, tip, onSkin(pos(tip)))
     }
+  }
+
+  /** Hold the thumb open and straight, pointing along `dirLocal` (laid onto the skin), a thumb-length ahead of its base. */
+  private pointThumb(hand: SceneObject, dirLocal: V3, nLocal: V3): void {
+    const chain = [0, 1, 2].map((i) => findChild(hand, "thumb-" + i))
+    const tip = findChild(hand, "thumb-3")
+    if (chain.some((x) => !x) || !tip) return
+    const legM = this.frame.getWorldTransform()
+    const n = legM.multiplyDirection(toVec3(nLocal)).normalize()
+    const dir = this.onPlane(legM.multiplyDirection(toVec3(dirLocal)), n)
+    const pos = (o: SceneObject) => o.getTransform().getWorldPosition()
+    const base = pos(chain[0])
+    let reach = 0
+    for (let k = 0; k < 3; k++) reach += pos(k < 2 ? chain[k + 1] : tip).distance(pos(chain[k]))
+    const s = this.shape.project(this.toLocal(base.add(dir.uniformScale(reach * 0.95))))
+    this.aimThumb(chain, tip, legM.multiplyPoint(toVec3(add(s.p, scale(s.n, THUMB_LIFT_CM + 0.4)))))
   }
 
   /** Cyclic joint-by-joint aiming of the end of `chain` (at `tip`) at a point, last joint first, a little at a time per joint. */
