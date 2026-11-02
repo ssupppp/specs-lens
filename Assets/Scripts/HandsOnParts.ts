@@ -46,6 +46,8 @@ export interface HandPose {
   thumbAroundDeg?: number
   /** Thumb always rests on the knee side (top of the view) of the palm, even when the stroke runs toward the ankle. */
   thumbKneeSide?: boolean
+  /** Leave the thumb open in the hand's natural pose (not bent onto a target). */
+  thumbOpen?: boolean
 }
 
 export interface SurfaceSpot {
@@ -91,8 +93,8 @@ export const PARTS: PartDef[] = [
     pose: "faceDown",
     cue: "Palms hug the sides of the calf, fingers pointing up toward the knee; both thumbs side by side on the centre line, gliding along the arrow (ankle to knee).",
     hands: [
-      {along: -3, aroundDeg: -70, fingerYawDeg: 25, curlDeg: 70, thumbOnArrow: true, thumbLeadCm: 6, thumbAroundDeg: 24},
-      {along: -3, aroundDeg: 70, fingerYawDeg: -25, curlDeg: 70, thumbOnArrow: true, thumbLeadCm: 6, thumbAroundDeg: 24},
+      {along: -3, aroundDeg: -64, fingerYawDeg: 25, curlDeg: 70, thumbOnArrow: true, thumbLeadCm: 6, thumbAroundDeg: 24, thumbOpen: true},
+      {along: -3, aroundDeg: 64, fingerYawDeg: -25, curlDeg: 70, thumbOnArrow: true, thumbLeadCm: 6, thumbAroundDeg: 24, thumbOpen: true},
     ],
     suggested: {start: {region: "leg", a: 31, b: 180}, end: {region: "leg", a: 9, b: 180}},
     zoneCm: {from: 8, to: 32},

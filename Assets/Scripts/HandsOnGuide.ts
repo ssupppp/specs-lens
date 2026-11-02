@@ -413,6 +413,7 @@ export class HandsOnGuide {
         fingersFixed: true,
         thumbTarget: pose.thumbOnArrow ? this.thumbTarget(pose, thumbS) : undefined,
         maxCurlDeg: pose.curlDeg,
+        thumbOpen: pose.thumbOpen,
       }
     })
   }

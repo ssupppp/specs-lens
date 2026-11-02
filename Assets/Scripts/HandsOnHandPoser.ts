@@ -45,6 +45,8 @@ export interface HandSpec {
   /** Leg-local point the thumb tip reaches for (as far as it can); otherwise it rests on the nearest skin. */
   thumbTarget?: V3
   maxCurlDeg: number
+  /** Keep the thumb open in the hand's natural pose instead of bending it onto the skin. */
+  thumbOpen?: boolean
 }
 
 /** A hand placed and seated on the leg, waiting for its fingers and thumb. */
@@ -109,7 +111,7 @@ export class HandsOnHandPoser {
         ? {mid: vec3.lerp(me.palmCentre, other.palmCentre, 0.5), u: me.palmCentre.sub(other.palmCentre).normalize()}
         : null
       for (const f of FINGERS) this.wrapFinger(me.hand, f, me.palmDir, me.spec.maxCurlDeg, keep)
-      this.seatThumb(me.hand, me.spec.thumbTarget ?? null)
+      if (!me.spec.thumbOpen) this.seatThumb(me.hand, me.spec.thumbTarget ?? null)
     }
   }
 
