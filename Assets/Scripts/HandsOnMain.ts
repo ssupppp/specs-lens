@@ -40,6 +40,11 @@ const HINT_TEXT: Record<Exclude<Step, "guide">, string> = {
 const HINT_ABOVE_LEG_CM = 10
 /** Where the calf's middle sits along the shank, knee (0) to ankle (1). */
 const CALF_MIDDLE_FRACTION = 0.4
+/**
+ * The leg is placed this many degrees below level along the head's heading: at 105 cm that is about 101 cm
+ * below the eyes, the height of a bed or treatment table seen from a standing adult.
+ */
+const PLACE_PITCH_DEG = -75
 const CHOICES_ABOVE_LEG_CM = 8
 /** Hint sits this far (on screen) above the choice row: clears the chips and the hint's own height. */
 const HINT_ABOVE_CHOICES_CM = 6
@@ -497,10 +502,10 @@ export class HandsOnMain extends BaseScriptComponent {
         const dir = flat.normalize()
         const base = new vec3(0, 0, -1)
         const yaw = dir.dot(base) < -0.999 ? quat.angleAxis(Math.PI, vec3.up()) : quat.rotationFromTo(base, dir)
-        // the middle of the calf goes where the head is looking (looking down at the bed puts it
-        // on the bed below); the leg itself stays level
-        const pitch = Math.max(-80, Math.min(10, (Math.asin(Math.max(-1, Math.min(1, look.normalize().y))) * 180) / Math.PI))
-        const aim = yaw.multiply(quat.angleAxis((pitch * Math.PI) / 180, vec3.right()))
+        // the middle of the calf goes on the bed below: in the direction the head faces, but at a fixed
+        // downward angle. (Following the gaze put it at chest height in front of the wall whenever the
+        // camera was level.) The leg itself stays level.
+        const aim = yaw.multiply(quat.angleAxis((PLACE_PITCH_DEG * Math.PI) / 180, vec3.right()))
         const target = cam.getWorldPosition().add(aim.multiplyVec3(new vec3(0, 0, -this.focusDistanceCm)))
         const rt = this.legRig.getTransform()
         rt.setWorldRotation(yaw.multiply(this.rigLocalRot))

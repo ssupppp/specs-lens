@@ -27,6 +27,15 @@ export interface LegTap {
 
 /** How long the leg takes to roll between face down and face up. */
 const ROLL_SECONDS = 0.7
+/**
+ * The padded massage-table top the leg lies on (W along the leg / H / D across), cm. Long enough to run off
+ * the top and bottom of the view, narrow enough that both side edges show (the display is ~49 cm wide at
+ * 105 cm), so it reads as a treatment table. Replaces the inspector's cushionSizeCm (the scene stores the
+ * old 62 x 7 x 26 value).
+ */
+const TABLE_SIZE_CM = new vec3(130, 8, 44)
+/** Opaque deep teal upholstery: the light leg and light-blue hands read against it, and it isn't grey. */
+const TABLE_COLOR = new vec4(0.1, 0.24, 0.28, 1)
 
 @component
 export class HandsOnLegModel extends BaseScriptComponent {
@@ -187,10 +196,15 @@ export class HandsOnLegModel extends BaseScriptComponent {
     })
 
     if (this.cushion) {
-      const s = this.cushionSizeCm
+      const s = TABLE_SIZE_CM
       const cushionRmv = this.cushion.createComponent("Component.RenderMeshVisual") as RenderMeshVisual
       cushionRmv.mesh = buildCushionMesh(s.x, s.y, s.z).getMesh()
-      if (this.cushionMaterial) cushionRmv.mainMaterial = this.cushionMaterial
+      if (this.cushionMaterial) {
+        const mat = this.cushionMaterial.clone()
+        mat.mainPass.baseColor = TABLE_COLOR
+        mat.mainPass.blendMode = BlendMode.Normal // the stock cushion material is see-through
+        cushionRmv.mainMaterial = mat
+      }
       this.fitCushionUnderLeg()
     } else {
       console.warn("[HandsOnLegModel] cushion not wired; skipping cushion")
@@ -268,6 +282,6 @@ export class HandsOnLegModel extends BaseScriptComponent {
     const t = this.cushion.getTransform()
     const pos = t.getLocalPosition()
     // sink the leg ~0.8 cm into the soft cushion so it reads as resting, not floating
-    t.setLocalPosition(new vec3(pos.x, minY - this.cushionSizeCm.y / 2 + 0.8, pos.z))
+    t.setLocalPosition(new vec3(pos.x, minY - TABLE_SIZE_CM.y / 2 + 0.8, pos.z))
   }
 }
