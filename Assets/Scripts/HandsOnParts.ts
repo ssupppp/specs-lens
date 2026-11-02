@@ -44,6 +44,8 @@ export interface HandPose {
   thumbAcrossCm?: number
   /** Instead of thumbAcrossCm: degrees around the limb from the arrow line, so the gap shrinks with the leg. */
   thumbAroundDeg?: number
+  /** Thumb always rests on the knee side (top of the view) of the palm, even when the stroke runs toward the ankle. */
+  thumbKneeSide?: boolean
 }
 
 export interface SurfaceSpot {
@@ -66,6 +68,8 @@ export interface PartDef {
   hands: HandPose[]
   /** Default stroke start/end (tests, demos). */
   suggested: {start: SurfaceSpot; end: SurfaceSpot}
+  /** Where this part's stroke belongs, cm from the knee. A stroke placed outside is slid up or down the leg into it. */
+  zoneCm?: {from: number; to: number}
 }
 
 /**
@@ -87,10 +91,11 @@ export const PARTS: PartDef[] = [
     pose: "faceDown",
     cue: "Palms hug the sides of the calf, fingers pointing up toward the knee; both thumbs side by side on the centre line, gliding along the arrow (ankle to knee).",
     hands: [
-      {along: -4, aroundDeg: -62, fingerYawDeg: -8, curlDeg: 60, thumbOnArrow: true, thumbLeadCm: 7, thumbAroundDeg: 58},
-      {along: -4, aroundDeg: 62, fingerYawDeg: 8, curlDeg: 60, thumbOnArrow: true, thumbLeadCm: 7, thumbAroundDeg: 58},
+      {along: -4, aroundDeg: -62, fingerYawDeg: -8, curlDeg: 60, thumbOnArrow: true, thumbLeadCm: 7, thumbAroundDeg: 58, thumbKneeSide: true},
+      {along: -4, aroundDeg: 62, fingerYawDeg: 8, curlDeg: 60, thumbOnArrow: true, thumbLeadCm: 7, thumbAroundDeg: 58, thumbKneeSide: true},
     ],
     suggested: {start: {region: "leg", a: 31, b: 180}, end: {region: "leg", a: 9, b: 180}},
+    zoneCm: {from: 8, to: 32},
   },
   {
     id: "shin",

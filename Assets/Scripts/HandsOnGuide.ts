@@ -362,8 +362,7 @@ export class HandsOnGuide {
     const a = this.arrow
     const verts = a.vertexS.length
     // where the thumbs are on the path (the press points are spaced between lead and the head)
-    const lead = this.leadFraction(this.part.hands[0])
-    const thumbS = lead + prog * (1 - lead)
+    const thumbS = this.thumbStartS() + prog * (1 - this.leadFraction(this.part.hands[0]))
     const flowGain = 0.45 + 0.55 * shimmer
     for (let v = 0; v < verts; v++) {
       const sv = a.vertexS[v]
@@ -399,10 +398,12 @@ export class HandsOnGuide {
       // ahead of it to the arrowhead. (The path stops at its ends: a thumb pinned at the head while the
       // palm kept coming folded up.)
       const lead = this.leadFraction(pose)
-      const s = pose.thumbOnArrow ? prog * (1 - lead) : Math.max(0, Math.min(1, prog + pose.along / len))
+      // palm starts at the tail, or `lead` in when the thumb trails (thumb at the tail, kept above the palm)
+      const palmStart = this.thumbTrails() ? lead : 0
+      const s = pose.thumbOnArrow ? palmStart + prog * (1 - lead) : Math.max(0, Math.min(1, prog + pose.along / len))
       const o = this.path.offset(s, 0, 0)
       const yaw = (pose.fingerYawDeg + (this.flipFingers[i] ? 180 : 0)) * DEG
-      const thumbS = Math.min(1, s + lead)
+      const thumbS = this.thumbTrails() ? Math.max(0, s - lead) : Math.min(1, s + lead)
       return {
         palm: this.aroundArrow(o, pose.aroundDeg),
         fingers: Math.abs(pose.fingerYawDeg) > WRAP_YAW_DEG ? undefined : add(scale(o.t, Math.cos(yaw)), scale(o.right, Math.sin(yaw))),
@@ -429,10 +430,22 @@ export class HandsOnGuide {
     return Math.min(MAX_LEAD_FRACTION, (pose.thumbLeadCm ?? THUMB_LEAD_CM) / this.path.length)
   }
 
+  /** The stroke runs toward the ankle but the thumb stays on the knee side: it sits behind the palm instead of ahead of it. */
+  private thumbTrails(): boolean {
+    const h = this.part.hands[0]
+    const pts = this.path.pts
+    return !!h.thumbOnArrow && !!h.thumbKneeSide && pts[pts.length - 1][0] > pts[0][0]
+  }
+
+  /** Path position of the thumb tip at progress 0 (it leads the palm, or starts at the tail when it trails). */
+  private thumbStartS(): number {
+    return this.thumbTrails() ? 0 : this.leadFraction(this.part.hands[0])
+  }
+
   /** Path position of press point `i`: where the thumbs press (or the palm, with no thumb on the arrow). */
   private stationS(i: number): number {
-    const lead = this.leadFraction(this.part.hands[0])
-    return lead + (i / this.stations) * (1 - lead)
+    const start = this.thumbStartS()
+    return start + (i / this.stations) * (1 - this.leadFraction(this.part.hands[0]))
   }
 
   /** The skin `deg` degrees around the limb from the arrow point `o` (+ = right of the arrow). */

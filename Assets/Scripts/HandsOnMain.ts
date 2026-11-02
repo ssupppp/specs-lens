@@ -22,7 +22,7 @@ import WorldCameraFinderProvider from "SpectaclesInteractionKit.lspkg/Providers/
 import {HandsOnGuide} from "./HandsOnGuide"
 import {HandsOnGuideUI} from "./HandsOnGuideUI"
 import {HandsOnLegModel, LegTap} from "./HandsOnLegModel"
-import {StrokePath, toVec3} from "./HandsOnLegGeometry"
+import {StrokePath, V3, toVec3} from "./HandsOnLegGeometry"
 import {LegPose, OFF_CHOICE_ID, OFF_CHOICE_NAME, PARTS, PartDef, findPart} from "./HandsOnParts"
 import {HandsOnSpots} from "./HandsOnSpots"
 
@@ -364,7 +364,8 @@ export class HandsOnMain extends BaseScriptComponent {
     if (pts.length < 2) return
     this.retireGuide()
     const legT = this.legModel.getSceneObject().getTransform()
-    const path = new StrokePath(this.legModel.shape, this.legModel.worldToLocal(pts[0]), this.legModel.worldToLocal(pts[1]))
+    const [p0, p1] = this.fitToZone(part, this.legModel.worldToLocal(pts[0]), this.legModel.worldToLocal(pts[1]))
+    const path = new StrokePath(this.legModel.shape, p0, p1)
     const guide = new HandsOnGuide(
       part,
       path,
@@ -390,6 +391,29 @@ export class HandsOnMain extends BaseScriptComponent {
     this.guideUI.showLabel(part.label, this.keepInView(guide.sideAnchorWorld(LABEL_SIDE_GAP_CM + this.guideUI.getLabelWidthCm() / 2, LABEL_LIFT_CM), this.guideUI.getLabelWidthCm() / 2))
     console.log("[HandsOn] guide on: " + part.id + " (" + part.label + "), arrow " + path.length.toFixed(1) + " cm")
     this.setStep("guide")
+  }
+
+  /**
+   * Slide a stroke placed outside the part's zone up or down the leg until it sits inside, keeping its length
+   * and direction (if it is longer than the zone, each end is clamped instead). Leg-local points.
+   */
+  private fitToZone(part: PartDef, a: V3, b: V3): [V3, V3] {
+    const z = part.zoneCm
+    if (!z) return [a, b]
+    const kneeX = this.legModel.shape.kneeX
+    const ca = a[0] - kneeX
+    const cb = b[0] - kneeX
+    const lo = Math.min(ca, cb)
+    const hi = Math.max(ca, cb)
+    let d = 0
+    if (hi - lo >= z.to - z.from) {
+      const clamp = (v: number) => Math.max(z.from, Math.min(z.to, v))
+      return [[kneeX + clamp(ca), a[1], a[2]], [kneeX + clamp(cb), b[1], b[2]]]
+    }
+    if (lo < z.from) d = z.from - lo
+    else if (hi > z.to) d = z.to - hi
+    if (d !== 0) console.log("[HandsOn] stroke was off the " + part.name + " zone; slid " + d.toFixed(1) + " cm along the leg")
+    return [[a[0] + d, a[1], a[2]], [b[0] + d, b[1], b[2]]]
   }
 
   private retireGuide(): void {
