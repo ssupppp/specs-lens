@@ -414,7 +414,6 @@ export class HandsOnGuide {
         thumbTarget: pose.thumbOnArrow ? this.thumbTarget(pose, thumbS) : undefined,
         maxCurlDeg: pose.curlDeg,
         thumbOpen: pose.thumbOpen,
-        thumbDir: pose.thumbOpen ? o.t : undefined,
       }
     })
   }
