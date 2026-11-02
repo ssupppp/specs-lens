@@ -91,8 +91,8 @@ export const PARTS: PartDef[] = [
     pose: "faceDown",
     cue: "Palms hug the sides of the calf, fingers pointing up toward the knee; both thumbs side by side on the centre line, gliding along the arrow (ankle to knee).",
     hands: [
-      {along: -4, aroundDeg: -62, fingerYawDeg: -8, curlDeg: 60, thumbOnArrow: true, thumbLeadCm: 7, thumbAroundDeg: 58, thumbKneeSide: true},
-      {along: -4, aroundDeg: 62, fingerYawDeg: 8, curlDeg: 60, thumbOnArrow: true, thumbLeadCm: 7, thumbAroundDeg: 58, thumbKneeSide: true},
+      {along: -4, aroundDeg: -80, fingerYawDeg: -8, curlDeg: 60, thumbOnArrow: true, thumbLeadCm: 7, thumbAroundDeg: 22},
+      {along: -4, aroundDeg: 80, fingerYawDeg: 8, curlDeg: 60, thumbOnArrow: true, thumbLeadCm: 7, thumbAroundDeg: 22},
     ],
     suggested: {start: {region: "leg", a: 31, b: 180}, end: {region: "leg", a: 9, b: 180}},
     zoneCm: {from: 8, to: 32},

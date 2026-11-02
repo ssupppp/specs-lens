@@ -38,6 +38,7 @@ const FADE_SECONDS = 0.3
 const STROKE_PAUSE = 0.5
 const HAND_FADE = 0.25
 const DEG = Math.PI / 180
+const HAND_SCALE = 0.82
 /** Press points along the stroke: about one per this many cm of thumb travel, kept between the limits. The hands are posed at each. */
 const STATION_SPACING_CM = 6
 const MIN_STATIONS = 2
@@ -160,6 +161,8 @@ export class HandsOnGuide {
       const hand = (side === "R" ? look.rightHandPrefab : look.leftHandPrefab).instantiate(this.root)
       hand.name = "GhostHand_" + part.name + "_" + side
       useFullMesh(hand, this.handMat)
+      // the stand-in leg is slim (ankle radius 3 cm), so the stock hands are shrunk to a believable size on it
+      hand.getTransform().setLocalScale(new vec3(HAND_SCALE, HAND_SCALE, HAND_SCALE))
       const joints = allTransforms(hand)
       this.rigs.push({joints, restPos: joints[0].getLocalPosition(), restRot: joints.map((t) => t.getLocalRotation())})
       this.hands.push(hand)
