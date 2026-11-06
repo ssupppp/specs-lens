@@ -1,12 +1,12 @@
 studioVersion:
   major: 5
-  minor: 24
-  patch: 1
-  build: 26100516
+  minor: 23
+  patch: 2
+  build: 26081320
   type: Public
-coreVersion: 377
-clientVersion: 14.21
-updateCheckpoint: 107
+coreVersion: 372
+clientVersion: 14.16
+updateCheckpoint: 102
 sceneId: 0a1ccb1a-fe88-4fbb-9883-e3af3c75fd99
 metaInfo:
   hints:
@@ -28,7 +28,6 @@ metaInfo:
   platformBundlesEnabled: false
   iconHash: ""
   videoPreviewHash: ""
-  localizationsHash: ""
   fromTemplateName: Specs Base Template
   fromTemplateUrl: Lens Studio 5.24.1.26100516
   activationCamera: Front
