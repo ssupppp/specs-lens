@@ -406,14 +406,17 @@ export class HandsOnGuide {
       const flow = Math.pow(0.5 + 0.5 * Math.cos(2 * Math.PI * phase), 3)
       const ahead = shimmer * Math.exp(-Math.pow((sv - thumbS - 0.05) / 0.1, 2))
       const k = Math.min(1.3, 0.15 + 0.75 * lit + (1 - lit) * (0.4 * flowGain * flow + 0.5 * ahead)) * this.alpha
-      // passed chevrons change colour (amber -> pale yellow), not just brightness; the green check overrides
+      // chevrons the hand has crossed turn the same confirm-green as a correct drag (checkColor), not
+      // just brighter -- a clear "crossed" signal that reads as a snap thanks to the narrow `lit` ramp
+      // above. They hold green through the end-of-stroke pause, then drop back to gold together as the
+      // hand fades out and the loop restarts (thumbS resets to ~0, so `lit` does too for every vertex).
       const m = lit * (1 - gm) * PASSED_MIX
       const d = a.baseData
       a.builder.setVertexInterleaved(v, [
         d[v * 6], d[v * 6 + 1], d[v * 6 + 2], d[v * 6 + 3], d[v * 6 + 4], d[v * 6 + 5],
-        (base[0] + (PASSED_TINT.x - base[0]) * m) * k,
-        (base[1] + (PASSED_TINT.y - base[1]) * m) * k,
-        (base[2] + (PASSED_TINT.z - base[2]) * m) * k,
+        (base[0] + (g.x - base[0]) * m) * k,
+        (base[1] + (g.y - base[1]) * m) * k,
+        (base[2] + (g.z - base[2]) * m) * k,
         1,
       ])
     }
