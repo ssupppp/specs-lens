@@ -55,6 +55,9 @@ const THUMB_LEAD_CM = 1.5
 const THUMB_ACROSS_CM = 0.9
 /** A thumb may lead the palm by at most this share of the stroke, so short strokes still move forward. */
 const MAX_LEAD_FRACTION = 0.6
+/** The thumb's lead never eases below this share of its full amount, even right at the head of the
+ * stroke — see leadEase. */
+const MIN_LEAD_KEEP = 0.4
 /** Never widen a grip's palm/thumb angle past this (degrees around the limb) while backing hands off each other —
  * kept short of the leg's side (90) so a widened grip still reads as hugging the calf, not wrapping round it. */
 const MAX_AROUND_DEG = 86
@@ -73,20 +76,20 @@ const MAX_GLIDE_EXTRA_STEPS = 3
 const STAGGER_STEP_CM = 0.5
 const MAX_STAGGER_STEPS = 12
 /** The direction cue: a chain of ">" chevrons along the stroke with a pulse flowing the way the hands go. */
-const CHEVRON_SPACING_CM = 3.0
-const CHEVRON_HALF_WIDTH_CM = 2.2
-const CHEVRON_DEPTH_CM = 1.7
-const CHEVRON_THICK_CM = 0.75
+const CHEVRON_SPACING_CM = 2.2
+const CHEVRON_HALF_WIDTH_CM = 1.5
+const CHEVRON_DEPTH_CM = 1.1
+const CHEVRON_THICK_CM = 0.55
 /** What chevrons and press points the hands have passed turn into (pale yellow), and how fully. */
 const PASSED_TINT = new vec3(1.0, 0.96, 0.62)
-const PASSED_MIX = 0.85
+const PASSED_MIX = 0.95
 /** Gap kept between a chevron and the tail dot / a press point (a pressed point swells to ~1.3 cm). */
-const CHEVRON_CLEAR_CM = 1.4
+const CHEVRON_CLEAR_CM = 1.0
 /** Flow pulse: chevrons per pulse, and pulses passing per second. */
 const FLOW_CHEVRONS = 4
 const FLOW_HZ = 0.9
 const ARROW_LIFT_CM = 0.45
-const STATION_RADIUS_CM = 0.9
+const STATION_RADIUS_CM = 0.6
 
 export class HandsOnGuide {
   readonly part: PartDef
@@ -366,9 +369,10 @@ export class HandsOnGuide {
     // press points: dim until the hands reach them, then flare and swell while pressed
     const gold = this.look.arrowColor
     for (let i = 0; i < this.stationObjs.length; i++) {
-      const pulse = Math.max(0, 1 - Math.abs(u - i) * 2.5) * press
+      // narrow, fast falloff so the swell reads as a snap/pop at the moment of crossing, not a slow swell
+      const pulse = Math.max(0, 1 - Math.abs(u - i) * 6) * press
       const visited = u >= i - 0.01 ? 1 : 0
-      const k = Math.min(1.1, 0.35 + 0.35 * visited + 0.6 * pulse) * this.alpha
+      const k = Math.min(1.3, 0.18 + 0.55 * visited + 0.75 * pulse) * this.alpha
       const m = visited * PASSED_MIX
       this.stationMats[i].mainPass.baseColor = new vec4(
         (gold.x + (PASSED_TINT.x - gold.x) * m) * k,
@@ -376,7 +380,7 @@ export class HandsOnGuide {
         (gold.z + (PASSED_TINT.z - gold.z) * m) * k,
         1,
       )
-      const sc = 1 + 0.4 * pulse
+      const sc = 1 + 0.6 * pulse
       this.stationObjs[i].getTransform().setLocalScale(new vec3(sc, sc, sc))
     }
 
@@ -387,18 +391,21 @@ export class HandsOnGuide {
     const base = [n.x + (g.x - n.x) * gm, n.y + (g.y - n.y) * gm, n.z + (g.z - n.z) * gm]
     const a = this.arrow
     const verts = a.vertexS.length
-    // where the thumbs are on the path (the press points are spaced between lead and the head)
-    const thumbS = this.thumbStartS() + prog * (1 - this.leadFraction(this.part.hands[0]))
+    // where the thumbs are on the path, easing from a full lead at the tail down to none at the head
+    const leadNow = this.leadFraction(this.part.hands[0])
+    const thumbS = this.thumbTrails() ? prog * (1 - leadNow) : this.leadEase(prog, leadNow)
     const flowGain = 0.45 + 0.55 * shimmer
     for (let v = 0; v < verts; v++) {
       const sv = a.vertexS[v]
       // chevrons the thumbs have passed light up and stay lit; the ones still ahead stay dim, with a pulse
-      // running along them the way the hands go and a glow just in front of the thumbs
-      const lit = Math.max(0, Math.min(1, (thumbS - sv) / 0.05 + 0.5))
+      // running along them the way the hands go and a glow just in front of the thumbs. A narrow ramp
+      // (vs. a wide one) makes a chevron flip from dim to lit over a short travel distance, reading as
+      // a snap rather than a gradient.
+      const lit = Math.max(0, Math.min(1, (thumbS - sv) / 0.02 + 0.5))
       const phase = (sv * this.path.length) / CHEVRON_SPACING_CM / FLOW_CHEVRONS - this.time * FLOW_HZ
       const flow = Math.pow(0.5 + 0.5 * Math.cos(2 * Math.PI * phase), 3)
       const ahead = shimmer * Math.exp(-Math.pow((sv - thumbS - 0.05) / 0.1, 2))
-      const k = Math.min(1.1, 0.25 + 0.6 * lit + (1 - lit) * (0.4 * flowGain * flow + 0.5 * ahead)) * this.alpha
+      const k = Math.min(1.3, 0.15 + 0.75 * lit + (1 - lit) * (0.4 * flowGain * flow + 0.5 * ahead)) * this.alpha
       // passed chevrons change colour (amber -> pale yellow), not just brightness; the green check overrides
       const m = lit * (1 - gm) * PASSED_MIX
       const d = a.baseData
@@ -425,22 +432,29 @@ export class HandsOnGuide {
   private handSpecs(prog: number, widenDeg: number = 0, staggerCm: number = 0): HandSpec[] {
     const len = this.path.length
     return this.part.hands.map((pose, i) => {
-      // A hand with its thumb on the arrow moves as one piece: palm from the tail, thumb tip from `lead`
-      // ahead of it to the arrowhead. (The path stops at its ends: a thumb pinned at the head while the
-      // palm kept coming folded up.)
+      // The palm travels the whole stroke, start to end — it has to reach both tapped spots for
+      // the massage to actually cover them. The thumb leads ahead of it by `lead` at the tail,
+      // easing that lead back down to nothing by the head (see leadEase) instead of being pinned
+      // there while the palm kept coming (the fold this was built to avoid).
       const lead = this.leadFraction(pose)
-      // palm starts at the tail, or `lead` in when the thumb trails (thumb at the tail, kept above the palm)
-      const palmStart = this.thumbTrails() ? lead : 0
-      let s = pose.thumbOnArrow ? palmStart + prog * (1 - lead) : Math.max(0, Math.min(1, prog + pose.along / len))
+      const trails = this.thumbTrails()
+      let s = pose.thumbOnArrow ? (trails ? lead + prog * (1 - lead) : prog) : Math.max(0, Math.min(1, prog + pose.along / len))
       // last-resort fix for a point so narrow that no angle keeps two full hands apart: nudge the
       // hands fore/aft along the stroke instead, so each works with a little more leg radius than
       // the exact narrowest cross-section, rather than both fighting over the same one
       if (staggerCm !== 0) s = Math.max(0, Math.min(1, s + (i === 0 ? -1 : 1) * (staggerCm / len)))
       const o = this.path.offset(s, 0, 0)
-      const yaw = (pose.fingerYawDeg + (this.flipFingers[i] ? 180 : 0)) * DEG
-      const thumbS = this.thumbTrails() ? Math.max(0, s - lead) : Math.min(1, s + lead)
+      // aroundDeg only ever feeds a left/right tie-break (aroundArrow, thumbTarget's side), so negating
+      // it by sideSign cancels the path's own left/right (t, right) flipping cleanly when the stroke is
+      // drawn the other way. fingerYawDeg instead rebuilds an actual direction vector (cos*t + sin*right)
+      // — negating the angle there does NOT cancel that flip (it reconstructs the vector pointing the
+      // wrong way); adding 180 degrees does, since cos/sin of (yaw+180) are both negated together,
+      // matching t and right both flipping sign together.
+      const reversed = this.sideSign() < 0
+      const yaw = (pose.fingerYawDeg + (reversed ? 180 : 0) + (this.flipFingers[i] ? 180 : 0)) * DEG
+      const thumbS = trails ? Math.max(0, s - lead) : this.leadEase(s, lead)
       return {
-        palm: this.aroundArrow(o, this.widen(pose.aroundDeg, widenDeg)),
+        palm: this.aroundArrow(o, this.widen(pose.aroundDeg * this.sideSign(), widenDeg)),
         fingers: Math.abs(pose.fingerYawDeg) > WRAP_YAW_DEG ? undefined : add(scale(o.t, Math.cos(yaw)), scale(o.right, Math.sin(yaw))),
         fingersFixed: true,
         thumbTarget: pose.thumbOnArrow ? this.thumbTarget(pose, thumbS, widenDeg) : undefined,
@@ -456,19 +470,45 @@ export class HandsOnGuide {
   }
 
   /**
+   * +1 when the path runs a leg stroke's natural a-direction (decreasing, e.g. Calf's ankle -> knee);
+   * -1 when the user drew it the other way. The path's own (t, right) frame flips together with draw
+   * direction (right = cross(t, n), and n doesn't depend on draw direction) — so aroundDeg, which only
+   * ever feeds a left/right sign comparison, is corrected by negating it (two sign flips cancel). Foot-
+   * region strokes (Sole) are left alone: a has a different meaning there.
+   */
+  private sideSign(): number {
+    const pts = this.path.pts
+    if (this.path.shape.project(pts[0]).region !== "leg") return 1
+    return pts[pts.length - 1][0] < pts[0][0] ? 1 : -1
+  }
+
+  /**
    * Where the thumb tip rests, on its own side of the arrow line. By angle around the limb when the grip gives
    * one (so the two thumbs keep apart where the leg narrows toward the ankle), otherwise by cm across.
    */
   private thumbTarget(pose: HandPose, thumbS: number, widenDeg: number): V3 {
-    const side = Math.sign(pose.aroundDeg)
+    const side = Math.sign(pose.aroundDeg * this.sideSign())
     if (pose.thumbAroundDeg !== undefined) return this.aroundArrow(this.path.offset(thumbS, 0, 0), side * this.widen(pose.thumbAroundDeg, widenDeg)).p
     return this.path.offset(thumbS, side * (pose.thumbAcrossCm ?? THUMB_ACROSS_CM), 0).p
   }
 
-  /** How far the thumb tip leads the palm, as a share of the stroke (0 when the thumb is off the arrow). */
+  /** How far the thumb tip leads the palm at the tail, as a share of the stroke (0 when the thumb is off the arrow). */
   private leadFraction(pose: HandPose): number {
     if (!pose.thumbOnArrow) return 0
     return Math.min(MAX_LEAD_FRACTION, (pose.thumbLeadCm ?? THUMB_LEAD_CM) / this.path.length)
+  }
+
+  /**
+   * Thumb position (path s) for a thumb that leads the palm: `lead` ahead at the tail, easing down
+   * toward the head but never all the way to zero. A full ease-to-nothing was tried and rejected:
+   * with no lead left the thumb's target sits right where the palm already is — right at the edge
+   * of the part's usable zone (close to the knee bulge for Calf) — and visually reads as the thumb
+   * collapsing into the palm. Capping the ease at `MIN_LEAD_KEEP` of the full lead keeps a small,
+   * deliberate gap there; the thumb then clamps against the head by that same small amount instead
+   * of folding (the much larger pin this replaced).
+   */
+  private leadEase(s: number, lead: number): number {
+    return Math.min(1, s + lead * (MIN_LEAD_KEEP + (1 - MIN_LEAD_KEEP) * (1 - s)))
   }
 
   /** The stroke runs toward the ankle but the thumb stays on the knee side: it sits behind the palm instead of ahead of it. */
@@ -480,13 +520,19 @@ export class HandsOnGuide {
 
   /** Path position of the thumb tip at progress 0 (it leads the palm, or starts at the tail when it trails). */
   private thumbStartS(): number {
-    return this.thumbTrails() ? 0 : this.leadFraction(this.part.hands[0])
+    return this.stationS(0)
   }
 
-  /** Path position of press point `i`: where the thumbs press (or the palm, with no thumb on the arrow). */
+  /**
+   * Path position of press point/dot `i`, evenly spaced across the full tapped stroke (0 to 1) so
+   * every inter-station gap is identical — this keeps the marks and the chevron trail between them
+   * honoring the real start and end points with no gap. Deliberately NOT run through `leadEase`:
+   * that function eases the thumb's own pose target near the stroke's head (see leadEase's doc) and
+   * is unrelated to where a mark is drawn — coupling the two once caused the trailing gaps to compress
+   * below `buildChevronMesh`'s minimum room, silently dropping chevrons near the end.
+   */
   private stationS(i: number): number {
-    const start = this.thumbStartS()
-    return start + (i / this.stations) * (1 - this.leadFraction(this.part.hands[0]))
+    return i / this.stations
   }
 
   /** The skin `deg` degrees around the limb from the arrow point `o` (+ = right of the arrow). */
@@ -496,7 +542,9 @@ export class HandsOnGuide {
     const s1 = shape.sampleAt(at.region, at.a, at.b + deg)
     const s2 = shape.sampleAt(at.region, at.a, at.b - deg)
     const toRight = (q: SurfaceSample) => dot(sub(q.p, o.p), o.right) * Math.sign(deg)
-    return toRight(s1) >= toRight(s2) ? s1 : s2
+    const t1 = toRight(s1)
+    const t2 = toRight(s2)
+    return t1 >= t2 ? s1 : s2
   }
 
   /** Reset every joint in every rig to its rest pose, ready to pose again from scratch. */
