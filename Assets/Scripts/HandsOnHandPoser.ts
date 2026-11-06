@@ -397,3 +397,18 @@ export function allTransforms(root: SceneObject): Transform[] {
   visit(root)
   return out
 }
+
+/** Closest distance (cm) between any joint of `a` and any joint of `b`, after both are posed — the actual
+ * geometric separation of two posed hands, independent of how their placement was computed. */
+export function minJointDistance(a: SceneObject, b: SceneObject): number {
+  const A = allTransforms(a).map((t) => t.getWorldPosition())
+  const B = allTransforms(b).map((t) => t.getWorldPosition())
+  let best = Infinity
+  for (const pa of A) {
+    for (const pb of B) {
+      const d = pa.distance(pb)
+      if (d < best) best = d
+    }
+  }
+  return best
+}

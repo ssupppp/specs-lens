@@ -16,7 +16,7 @@
 import {Interactable} from "SpectaclesInteractionKit.lspkg/Components/Interaction/Interactable/Interactable"
 import {InteractableManipulation} from "SpectaclesInteractionKit.lspkg/Components/Interaction/InteractableManipulation/InteractableManipulation"
 import {HandPose, INTENSITY_PROFILE, PartDef} from "./HandsOnParts"
-import {HandSpec, HandsOnHandPoser, Side, allTransforms, ghostHandMaterial, useFullMesh} from "./HandsOnHandPoser"
+import {HandSpec, HandsOnHandPoser, Side, allTransforms, ghostHandMaterial, minJointDistance, useFullMesh} from "./HandsOnHandPoser"
 import {ArrowMesh, StrokePath, SurfaceSample, V3, add, buildChevronMesh, buildDiscMesh, dot, scale, sub, toVec3} from "./HandsOnLegGeometry"
 
 export interface GuideLook {
@@ -55,6 +55,12 @@ const THUMB_LEAD_CM = 1.5
 const THUMB_ACROSS_CM = 0.9
 /** A thumb may lead the palm by at most this share of the stroke, so short strokes still move forward. */
 const MAX_LEAD_FRACTION = 0.6
+/** Never widen a grip's palm/thumb angle past this (degrees around the limb) while backing hands off each other. */
+const MAX_AROUND_DEG = 88
+/** Two hands closer than this (cm, nearest pair of joints) read as touching; widen the grip until they clear it. */
+const MIN_HAND_GAP_CM = 2.2
+const WIDEN_STEP_DEG = 2
+const MAX_WIDEN_STEPS = 14
 /** The direction cue: a chain of ">" chevrons along the stroke with a pulse flowing the way the hands go. */
 const CHEVRON_SPACING_CM = 3.0
 const CHEVRON_HALF_WIDTH_CM = 2.2
@@ -103,6 +109,8 @@ export class HandsOnGuide {
   private readonly rigs: {joints: Transform[]; restPos: vec3; restRot: quat[]}[] = []
   /** Per hand, per press point: the hand's position, the skin normal there, and every joint's rotation (local). */
   private readonly keys: {pos: vec3; n: vec3; rot: quat[]}[][] = []
+  /** Widen amount (degrees) baked into each built key, by key index — so a glide's two ends can be compared. */
+  private readonly keyWiden: number[] = []
   /** Number of glides in a stroke; there are stations + 1 press points. */
   private readonly stations: number
   /** Press-point discs along the arrow, and their materials. */
@@ -393,8 +401,13 @@ export class HandsOnGuide {
     this.dotMat.mainPass.baseColor = new vec4(base[0] * dk, base[1] * dk, base[2] * dk, 1)
   }
 
-  /** Both hands' grip with the stroke at `prog` (0 = arrow start, 1 = end), Leg-local. */
-  private handSpecs(prog: number): HandSpec[] {
+  /**
+   * Both hands' grip with the stroke at `prog` (0 = arrow start, 1 = end), Leg-local.
+   * `widenDeg` pushes each hand's palm (and thumb target) further around the limb, away from
+   * centre, by this many extra degrees — used to back the hands off each other where the leg
+   * narrows and the grip's nominal angles would otherwise bring them into contact.
+   */
+  private handSpecs(prog: number, widenDeg: number = 0): HandSpec[] {
     const len = this.path.length
     return this.part.hands.map((pose, i) => {
       // A hand with its thumb on the arrow moves as one piece: palm from the tail, thumb tip from `lead`
@@ -408,23 +421,28 @@ export class HandsOnGuide {
       const yaw = (pose.fingerYawDeg + (this.flipFingers[i] ? 180 : 0)) * DEG
       const thumbS = this.thumbTrails() ? Math.max(0, s - lead) : Math.min(1, s + lead)
       return {
-        palm: this.aroundArrow(o, pose.aroundDeg),
+        palm: this.aroundArrow(o, this.widen(pose.aroundDeg, widenDeg)),
         fingers: Math.abs(pose.fingerYawDeg) > WRAP_YAW_DEG ? undefined : add(scale(o.t, Math.cos(yaw)), scale(o.right, Math.sin(yaw))),
         fingersFixed: true,
-        thumbTarget: pose.thumbOnArrow ? this.thumbTarget(pose, thumbS) : undefined,
+        thumbTarget: pose.thumbOnArrow ? this.thumbTarget(pose, thumbS, widenDeg) : undefined,
         maxCurlDeg: pose.curlDeg,
         thumbOpen: pose.thumbOpen,
       }
     })
   }
 
+  /** `deg` pushed `extraDeg` further from centre (magnitude up from 0), capped short of the limb's far side. */
+  private widen(deg: number, extraDeg: number): number {
+    return Math.sign(deg) * Math.min(MAX_AROUND_DEG, Math.abs(deg) + extraDeg)
+  }
+
   /**
    * Where the thumb tip rests, on its own side of the arrow line. By angle around the limb when the grip gives
    * one (so the two thumbs keep apart where the leg narrows toward the ankle), otherwise by cm across.
    */
-  private thumbTarget(pose: HandPose, thumbS: number): V3 {
+  private thumbTarget(pose: HandPose, thumbS: number, widenDeg: number): V3 {
     const side = Math.sign(pose.aroundDeg)
-    if (pose.thumbAroundDeg !== undefined) return this.aroundArrow(this.path.offset(thumbS, 0, 0), side * pose.thumbAroundDeg).p
+    if (pose.thumbAroundDeg !== undefined) return this.aroundArrow(this.path.offset(thumbS, 0, 0), side * this.widen(pose.thumbAroundDeg, widenDeg)).p
     return this.path.offset(thumbS, side * (pose.thumbAcrossCm ?? THUMB_ACROSS_CM), 0).p
   }
 
@@ -462,14 +480,22 @@ export class HandsOnGuide {
     return toRight(s1) >= toRight(s2) ? s1 : s2
   }
 
-  /** Pose both hands for the next point along the stroke and keep the result. */
-  private poseNextKey(): void {
-    const k = this.keys[0].length
+  /** Reset every joint in every rig to its rest pose, ready to pose again from scratch. */
+  private resetRigs(): void {
     for (const rig of this.rigs) {
       rig.joints[0].setLocalPosition(rig.restPos)
       rig.joints.forEach((t, j) => t.setLocalRotation(rig.restRot[j]))
     }
-    const specs = this.handSpecs(k / this.stations)
+  }
+
+  /**
+   * Pose both hands for key `k` (0..stations) at widen amount `widen` and record the result,
+   * overwriting that key if it already exists. The hands are left in this pose when the call
+   * returns; callers that only want to measure it (not display it) must pose over it again.
+   */
+  private buildKey(k: number, widen: number): void {
+    this.resetRigs()
+    const specs = this.handSpecs(k / this.stations, widen)
     this.poser.pose(specs, this.hands, this.sides)
     // gentle hovers just off the skin, firm sinks in a little
     const lift = INTENSITY_PROFILE[this.part.intensity].liftCm
@@ -478,8 +504,63 @@ export class HandsOnGuide {
       const ht = this.hands[i].getTransform()
       const n = m.multiplyDirection(toVec3(specs[i].palm.n)).normalize()
       ht.setWorldPosition(ht.getWorldPosition().add(n.uniformScale(lift)))
-      this.keys[i].push({pos: ht.getLocalPosition(), n: toVec3(specs[i].palm.n), rot: this.rigs[i].joints.map((t) => t.getLocalRotation())})
+      const entry = {pos: ht.getLocalPosition(), n: toVec3(specs[i].palm.n), rot: this.rigs[i].joints.map((t) => t.getLocalRotation())}
+      if (k < this.keys[i].length) this.keys[i][k] = entry
+      else this.keys[i].push(entry)
     }
+    this.keyWiden[k] = widen
+  }
+
+  /** Pose both hands for the next point along the stroke and keep the result. */
+  private poseNextKey(): void {
+    const k = this.keys[0].length
+    let widen = 0
+    this.buildKey(k, widen)
+    // two hands only: back them off each other (wider around the limb) until they actually clear,
+    // checked on the posed joints themselves rather than guessed from the grip's nominal angles —
+    // a grip that looks fine on a wide calf can still close up where the leg narrows to the ankle
+    if (this.hands.length === 2) {
+      for (let iter = 0; iter < MAX_WIDEN_STEPS && minJointDistance(this.hands[0], this.hands[1]) < MIN_HAND_GAP_CM; iter++) {
+        widen += WIDEN_STEP_DEG
+        this.buildKey(k, widen)
+      }
+    }
+    // the last key: every key now exists, so the glides between them (not just the keys
+    // themselves) can be checked and corrected
+    if (k === this.stations) this.resolveGlideOverlaps()
+  }
+
+  /**
+   * A key pair can each individually clear the other hand yet still cross mid-glide: the runtime
+   * blend is a per-joint slerp, which doesn't track the leg's surface, so the path between two
+   * safe poses isn't guaranteed safe itself. Sample a few points along every glide and, if any
+   * are too close, widen whichever of its two keys is currently less widened and recheck.
+   */
+  private resolveGlideOverlaps(): void {
+    if (this.hands.length !== 2) return
+    const samples = [0.2, 0.35, 0.5, 0.65, 0.8]
+    for (let pass = 0; pass < 2; pass++) {
+      for (let k0 = 0; k0 < this.stations; k0++) {
+        for (let guard = 0; guard < MAX_WIDEN_STEPS; guard++) {
+          if (!samples.some((w) => this.overlapAtGlide(k0, w))) break
+          if (this.keyWiden[k0] <= this.keyWiden[k0 + 1]) this.buildKey(k0, this.keyWiden[k0] + WIDEN_STEP_DEG)
+          else this.buildKey(k0 + 1, this.keyWiden[k0 + 1] + WIDEN_STEP_DEG)
+        }
+      }
+    }
+  }
+
+  /** Whether the two hands would overlap `w` of the way through the blend from key `k0` to `k0 + 1`
+   * (the same blend `updateStroke` plays) — leaves the rigs in that pose; callers don't rely on it. */
+  private overlapAtGlide(k0: number, w: number): boolean {
+    for (let i = 0; i < 2; i++) {
+      const a = this.keys[i][k0]
+      const b = this.keys[i][k0 + 1]
+      const joints = this.rigs[i].joints
+      joints[0].setLocalPosition(vec3.lerp(a.pos, b.pos, w))
+      for (let j = 0; j < joints.length; j++) joints[j].setLocalRotation(quat.slerp(a.rot[j], b.rot[j], w))
+    }
+    return minJointDistance(this.hands[0], this.hands[1]) < MIN_HAND_GAP_CM
   }
 
   // ── direction check (drag the arrow-start dot along the arrow) ──
