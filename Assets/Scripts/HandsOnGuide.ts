@@ -55,12 +55,23 @@ const THUMB_LEAD_CM = 1.5
 const THUMB_ACROSS_CM = 0.9
 /** A thumb may lead the palm by at most this share of the stroke, so short strokes still move forward. */
 const MAX_LEAD_FRACTION = 0.6
-/** Never widen a grip's palm/thumb angle past this (degrees around the limb) while backing hands off each other. */
-const MAX_AROUND_DEG = 88
+/** Never widen a grip's palm/thumb angle past this (degrees around the limb) while backing hands off each other —
+ * kept short of the leg's side (90) so a widened grip still reads as hugging the calf, not wrapping round it. */
+const MAX_AROUND_DEG = 86
 /** Two hands closer than this (cm, nearest pair of joints) read as touching; widen the grip until they clear it. */
 const MIN_HAND_GAP_CM = 2.2
 const WIDEN_STEP_DEG = 2
-const MAX_WIDEN_STEPS = 14
+/** A key's own pass: this point on the leg may genuinely need a lot of widening (a tight ankle has nowhere
+ * else to put two hands), so give it real headroom. */
+const MAX_WIDEN_STEPS = 10
+/** The glide-overlap pass, by contrast, is fixing a blend artifact between two already-posed keys, not
+ * re-tuning either one — cap how much extra it may add on top of a key's own widen, so a perfectly fine
+ * wide-calf key can't get dragged toward the side of the leg just to satisfy a transient mid-blend check. */
+const MAX_GLIDE_EXTRA_STEPS = 3
+/** Last-resort fix once widening is maxed out and hands still touch: nudge them fore/aft along the
+ * stroke, a little at a time, up to this many steps. */
+const STAGGER_STEP_CM = 0.5
+const MAX_STAGGER_STEPS = 12
 /** The direction cue: a chain of ">" chevrons along the stroke with a pulse flowing the way the hands go. */
 const CHEVRON_SPACING_CM = 3.0
 const CHEVRON_HALF_WIDTH_CM = 2.2
@@ -111,6 +122,10 @@ export class HandsOnGuide {
   private readonly keys: {pos: vec3; n: vec3; rot: quat[]}[][] = []
   /** Widen amount (degrees) baked into each built key, by key index — so a glide's two ends can be compared. */
   private readonly keyWiden: number[] = []
+  /** Each key's widen right after its own pass, before resolveGlideOverlaps adds anything further on top. */
+  private readonly keyBaseWiden: number[] = []
+  /** Fore/aft stagger (cm) baked into each built key, by key index — the last-resort fix past MAX_AROUND_DEG. */
+  private readonly keyStagger: number[] = []
   /** Number of glides in a stroke; there are stations + 1 press points. */
   private readonly stations: number
   /** Press-point discs along the arrow, and their materials. */
@@ -407,7 +422,7 @@ export class HandsOnGuide {
    * centre, by this many extra degrees — used to back the hands off each other where the leg
    * narrows and the grip's nominal angles would otherwise bring them into contact.
    */
-  private handSpecs(prog: number, widenDeg: number = 0): HandSpec[] {
+  private handSpecs(prog: number, widenDeg: number = 0, staggerCm: number = 0): HandSpec[] {
     const len = this.path.length
     return this.part.hands.map((pose, i) => {
       // A hand with its thumb on the arrow moves as one piece: palm from the tail, thumb tip from `lead`
@@ -416,7 +431,11 @@ export class HandsOnGuide {
       const lead = this.leadFraction(pose)
       // palm starts at the tail, or `lead` in when the thumb trails (thumb at the tail, kept above the palm)
       const palmStart = this.thumbTrails() ? lead : 0
-      const s = pose.thumbOnArrow ? palmStart + prog * (1 - lead) : Math.max(0, Math.min(1, prog + pose.along / len))
+      let s = pose.thumbOnArrow ? palmStart + prog * (1 - lead) : Math.max(0, Math.min(1, prog + pose.along / len))
+      // last-resort fix for a point so narrow that no angle keeps two full hands apart: nudge the
+      // hands fore/aft along the stroke instead, so each works with a little more leg radius than
+      // the exact narrowest cross-section, rather than both fighting over the same one
+      if (staggerCm !== 0) s = Math.max(0, Math.min(1, s + (i === 0 ? -1 : 1) * (staggerCm / len)))
       const o = this.path.offset(s, 0, 0)
       const yaw = (pose.fingerYawDeg + (this.flipFingers[i] ? 180 : 0)) * DEG
       const thumbS = this.thumbTrails() ? Math.max(0, s - lead) : Math.min(1, s + lead)
@@ -493,9 +512,9 @@ export class HandsOnGuide {
    * overwriting that key if it already exists. The hands are left in this pose when the call
    * returns; callers that only want to measure it (not display it) must pose over it again.
    */
-  private buildKey(k: number, widen: number): void {
+  private buildKey(k: number, widen: number, stagger: number = 0): void {
     this.resetRigs()
-    const specs = this.handSpecs(k / this.stations, widen)
+    const specs = this.handSpecs(k / this.stations, widen, stagger)
     this.poser.pose(specs, this.hands, this.sides)
     // gentle hovers just off the skin, firm sinks in a little
     const lift = INTENSITY_PROFILE[this.part.intensity].liftCm
@@ -509,6 +528,7 @@ export class HandsOnGuide {
       else this.keys[i].push(entry)
     }
     this.keyWiden[k] = widen
+    this.keyStagger[k] = stagger
   }
 
   /** Pose both hands for the next point along the stroke and keep the result. */
@@ -524,7 +544,17 @@ export class HandsOnGuide {
         widen += WIDEN_STEP_DEG
         this.buildKey(k, widen)
       }
+      // widening alone has a ceiling: at the true ankle minimum, no angle keeps two full hands
+      // apart, since they're just wider than the limb is round there. Once widen is maxed out and
+      // the hands still touch, stagger them slightly fore/aft along the stroke instead, so each
+      // works with a bit more leg radius than the exact narrowest cross-section.
+      let stagger = 0
+      for (let iter = 0; iter < MAX_STAGGER_STEPS && minJointDistance(this.hands[0], this.hands[1]) < MIN_HAND_GAP_CM; iter++) {
+        stagger += STAGGER_STEP_CM
+        this.buildKey(k, widen, stagger)
+      }
     }
+    this.keyBaseWiden[k] = widen
     // the last key: every key now exists, so the glides between them (not just the keys
     // themselves) can be checked and corrected
     if (k === this.stations) this.resolveGlideOverlaps()
@@ -533,19 +563,23 @@ export class HandsOnGuide {
   /**
    * A key pair can each individually clear the other hand yet still cross mid-glide: the runtime
    * blend is a per-joint slerp, which doesn't track the leg's surface, so the path between two
-   * safe poses isn't guaranteed safe itself. Sample a few points along every glide and, if any
-   * are too close, widen whichever of its two keys is currently less widened and recheck.
+   * safe poses isn't guaranteed safe itself. Sample a few points along every glide and, if any are
+   * too close, widen whichever of its two keys is currently less widened and recheck — but only up
+   * to a small extra amount past that key's own widen. This is fixing a blend artifact, not
+   * re-tuning either key's pose, so it must not have the range to drag an otherwise-fine key (a
+   * wide point that never needed widening) toward the side of the leg; a residual, minor mid-glide
+   * approach is a smaller problem than that.
    */
   private resolveGlideOverlaps(): void {
     if (this.hands.length !== 2) return
     const samples = [0.2, 0.35, 0.5, 0.65, 0.8]
-    for (let pass = 0; pass < 2; pass++) {
-      for (let k0 = 0; k0 < this.stations; k0++) {
-        for (let guard = 0; guard < MAX_WIDEN_STEPS; guard++) {
-          if (!samples.some((w) => this.overlapAtGlide(k0, w))) break
-          if (this.keyWiden[k0] <= this.keyWiden[k0 + 1]) this.buildKey(k0, this.keyWiden[k0] + WIDEN_STEP_DEG)
-          else this.buildKey(k0 + 1, this.keyWiden[k0 + 1] + WIDEN_STEP_DEG)
-        }
+    const cap = (k: number) => this.keyBaseWiden[k] + MAX_GLIDE_EXTRA_STEPS * WIDEN_STEP_DEG
+    for (let k0 = 0; k0 < this.stations; k0++) {
+      for (let guard = 0; guard < MAX_GLIDE_EXTRA_STEPS; guard++) {
+        if (!samples.some((w) => this.overlapAtGlide(k0, w))) break
+        const lower = this.keyWiden[k0] <= this.keyWiden[k0 + 1] ? k0 : k0 + 1
+        if (this.keyWiden[lower] >= cap(lower)) break // out of budget for this key; accept the residual risk
+        this.buildKey(lower, this.keyWiden[lower] + WIDEN_STEP_DEG, this.keyStagger[lower])
       }
     }
   }
