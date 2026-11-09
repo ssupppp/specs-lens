@@ -80,8 +80,7 @@ const CHEVRON_SPACING_CM = 2.2
 const CHEVRON_HALF_WIDTH_CM = 1.5
 const CHEVRON_DEPTH_CM = 1.1
 const CHEVRON_THICK_CM = 0.55
-/** What chevrons and press points the hands have passed turn into (pale yellow), and how fully. */
-const PASSED_TINT = new vec3(1.0, 0.96, 0.62)
+/** How fully chevrons and press points the hands have passed turn green. */
 const PASSED_MIX = 0.95
 /** Gap kept between a chevron and the tail dot / a press point (a pressed point swells to ~1.3 cm). */
 const CHEVRON_CLEAR_CM = 1.0
@@ -366,8 +365,10 @@ export class HandsOnGuide {
     const c = this.look.handColor
     this.handMat.mainPass.baseColor = new vec4(c.x * hk, c.y * hk, c.z * hk, Math.min(0.9, this.look.ghostHandStrength * (1 + 0.3 * press)) * hk)
 
-    // press points: dim until the hands reach them, then flare and swell while pressed
+    // press points: dim until the hands reach them, then flare and swell while pressed, turning
+    // the same confirm-green as a crossed chevron (not just a pale tint) once passed
     const gold = this.look.arrowColor
+    const green = this.look.checkColor
     for (let i = 0; i < this.stationObjs.length; i++) {
       // narrow, fast falloff so the swell reads as a snap/pop at the moment of crossing, not a slow swell
       const pulse = Math.max(0, 1 - Math.abs(u - i) * 6) * press
@@ -375,9 +376,9 @@ export class HandsOnGuide {
       const k = Math.min(1.3, 0.18 + 0.55 * visited + 0.75 * pulse) * this.alpha
       const m = visited * PASSED_MIX
       this.stationMats[i].mainPass.baseColor = new vec4(
-        (gold.x + (PASSED_TINT.x - gold.x) * m) * k,
-        (gold.y + (PASSED_TINT.y - gold.y) * m) * k,
-        (gold.z + (PASSED_TINT.z - gold.z) * m) * k,
+        (gold.x + (green.x - gold.x) * m) * k,
+        (gold.y + (green.y - gold.y) * m) * k,
+        (gold.z + (green.z - gold.z) * m) * k,
         1,
       )
       const sc = 1 + 0.6 * pulse
@@ -388,7 +389,12 @@ export class HandsOnGuide {
     const n = this.look.arrowColor
     const g = this.look.checkColor
     const gm = this.green
-    const base = [n.x + (g.x - n.x) * gm, n.y + (g.y - n.y) * gm, n.z + (g.z - n.z) * gm]
+    // hue is driven only by the per-vertex crossed state (lit), never by the whole-path
+    // "dragging correctly right now" flash (gm) -- gm used to blend into every vertex's
+    // base color uniformly, so while gm~1 (true for most of an active correct drag) the
+    // entire trail turned green together, masking the crossed/uncrossed distinction this
+    // was meant to show. gm now only brightens (see k below), never changes hue.
+    const base = [n.x, n.y, n.z]
     const a = this.arrow
     const verts = a.vertexS.length
     // where the thumbs are on the path, easing from a full lead at the tail down to none at the head
@@ -405,12 +411,17 @@ export class HandsOnGuide {
       const phase = (sv * this.path.length) / CHEVRON_SPACING_CM / FLOW_CHEVRONS - this.time * FLOW_HZ
       const flow = Math.pow(0.5 + 0.5 * Math.cos(2 * Math.PI * phase), 3)
       const ahead = shimmer * Math.exp(-Math.pow((sv - thumbS - 0.05) / 0.1, 2))
-      const k = Math.min(1.3, 0.15 + 0.75 * lit + (1 - lit) * (0.4 * flowGain * flow + 0.5 * ahead)) * this.alpha
+      // crossed chevrons must stay the brightest state, or the pre-cross glow/flow
+      // pulse (which can hit ~1.05) outshines the green and reads as "never turned
+      // green" even though the color math is correct -- so lit's ceiling (0.9) is
+      // raised past the pre-cross ceiling (0.85) here. gm (whole-path "correct now"
+      // flash) adds brightness only, never hue -- see `base` above.
+      const k = Math.min(1.3, (0.25 + 0.9 * lit + (1 - lit) * (0.3 * flowGain * flow + 0.3 * ahead)) * (1 + 0.35 * gm)) * this.alpha
       // chevrons the hand has crossed turn the same confirm-green as a correct drag (checkColor), not
       // just brighter -- a clear "crossed" signal that reads as a snap thanks to the narrow `lit` ramp
       // above. They hold green through the end-of-stroke pause, then drop back to gold together as the
       // hand fades out and the loop restarts (thumbS resets to ~0, so `lit` does too for every vertex).
-      const m = lit * (1 - gm) * PASSED_MIX
+      const m = lit * PASSED_MIX
       const d = a.baseData
       a.builder.setVertexInterleaved(v, [
         d[v * 6], d[v * 6 + 1], d[v * 6 + 2], d[v * 6 + 3], d[v * 6 + 4], d[v * 6 + 5],
